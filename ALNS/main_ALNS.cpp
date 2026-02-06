@@ -2,22 +2,22 @@
 #include "ALNS.h"
 #include "CostFunction.h"
 #include <iostream>
-#include <fstream>       // For CSV output
-#include "Feasibility.h" // For helper logic replication if needed, or just Distance/Comp
+#include <fstream>      
+#include "Feasibility.h" 
 #include "Compatibility.h"
 #include "Distance.h"
 #include <iomanip>
 
 #include<chrono>
 
-// Helper to check batch validity (Copied from Feasibility logic for visualization)
-bool checkBatchFits(const std::vector<int> &batch, int nextId, const Vehicle &v, const std::vector<Employee> &emp, double currentT, double currentX, double currentY)
+
+bool checkBatchFits(const std::vector<int> &batch, int nextId, const Vehicle &v, const std::vector<Employee> &emp, double currentT, double currentX, double currentY,const Metadata& meta)
 {
-    // 1. Capacity
+    
     if (batch.size() + 1 > v.seatCap)
         return false;
 
-    // 2. Share Pref
+    
     const auto &nextE = emp[nextId];
     int newSize = batch.size() + 1;
     if (nextE.sharePref < newSize)
@@ -26,7 +26,7 @@ bool checkBatchFits(const std::vector<int> &batch, int nextId, const Vehicle &v,
         if (emp[pid].sharePref < newSize)
             return false;
 
-    // 3. Time Feasibility (Lookahead)
+
     double dKm = distKm(currentX, currentY, nextE.x, nextE.y);
     double travelMin = (dKm / v.speed) * 60.0;
     double arrival = currentT + travelMin;
@@ -37,29 +37,24 @@ bool checkBatchFits(const std::vector<int> &batch, int nextId, const Vehicle &v,
     double timeToDest = (dDestKm / v.speed) * 60.0;
     double arrivalAtDest = depart + timeToDest;
 
-    if (arrivalAtDest > nextE.due + getMaxLateness(nextE.priority))
+    if (arrivalAtDest > nextE.due + getMaxLateness(nextE.priority,meta))
         return false;
 
-    // Check existing batch members constraints if we take this detour
-    // Simplified: In this model, everyone drops at the same time at Office.
-    // So we just check if the NEW arrival time at office works for everyone.
-    // The previous implementation in Feasibility checks this strictly.
+
     for (int bid : batch)
     {
-        if (arrivalAtDest > emp[bid].due + getMaxLateness(emp[bid].priority))
+        if (arrivalAtDest > emp[bid].due + getMaxLateness(emp[bid].priority,meta))
             return false;
     }
 
-    // Check vehicle end time
-    // If we pick up E, then go to Office...
-    // Arrival at Office = arrivalAtDest
+ 
     if (arrivalAtDest > v.endTime)
         return false;
 
     return true;
 }
 
-void printRouteTrace(const Route &r, const Vehicle &v, const std::vector<Employee> &emp, double &outDist, double &outDuration)
+void printRouteTrace(const Route &r, const Vehicle &v, const std::vector<Employee> &emp, double &outDist, double &outDuration, const Metadata& meta)
 {
     outDist = 0;
     outDuration = 0;
@@ -75,19 +70,20 @@ void printRouteTrace(const Route &r, const Vehicle &v, const std::vector<Employe
     {
         if (batch.empty())
             return;
-        // Drive to Office (last pickup -> Office)
+   
         const auto &last = emp[batch.back()];
         double dOff = distKm(currX, currY, last.destX, last.destY);
         double tOff = (dOff / v.speed) * 60.0;
         currT += tOff;
-        totalDist += dOff; // Track distance
+        outDuration += tOff*batch.size();
+        totalDist += dOff;
 
-        // Print Drops
+      
         for (int id : batch)
         {
             std::cout << emp[id].originalId << "(drop) -> ";
         }
-        currT += 0; // Drop service time removed
+        currT += 0; 
 
         currX = last.destX;
         currY = last.destY;
@@ -96,28 +92,33 @@ void printRouteTrace(const Route &r, const Vehicle &v, const std::vector<Employe
 
     for (int eId : r.seq)
     {
-        // Check if fits
-        if (!checkBatchFits(batch, eId, v, emp, t, cx, cy))
+     
+        if (!checkBatchFits(batch, eId, v, emp, t, cx, cy,meta))
         {
-            // Drop current batch
+         
             dropBatch(t, cx, cy);
 
-            // Drive from Office to eId
+            
             double dToE = distKm(cx, cy, emp[eId].x, emp[eId].y);
             t += (dToE / v.speed) * 60.0;
-            totalDist += dToE; // Track distance
+            outDuration += batch.size()*((dToE / v.speed) * 60.0);
+            totalDist += dToE;
         }
         else
         {
-            // Travel from current to eId
+           
             double d = distKm(cx, cy, emp[eId].x, emp[eId].y);
             t += (d / v.speed) * 60.0;
-            totalDist += d; // Track distance
+            outDuration += batch.size()*((d / v.speed) * 60.0);
+            totalDist += d; 
         }
 
-        // Pickup eId
+       
         std::cout << emp[eId].originalId << "(pickup) -> ";
 
+        if(t<emp[eId].ready){
+            outDuration+=(emp[eId].ready-t)*batch.size();
+        }
         double startService = std::max(t, emp[eId].ready);
         t = startService;
         cx = emp[eId].x;
@@ -125,7 +126,7 @@ void printRouteTrace(const Route &r, const Vehicle &v, const std::vector<Employe
         batch.push_back(eId);
     }
 
-    // Final drop
+   
     if (!batch.empty())
     {
         dropBatch(t, cx, cy);
@@ -134,10 +135,10 @@ void printRouteTrace(const Route &r, const Vehicle &v, const std::vector<Employe
     std::cout << "End";
 
     outDist = totalDist;
-    outDuration = t - v.startTime;
+    
 }
 
-// Helper to format minutes to HH:MM
+
 std::string formatTime(double mins)
 {
     int h = (int)(mins / 60.0);
@@ -148,22 +149,14 @@ std::string formatTime(double mins)
     return oss.str();
 }
 
-// Helper to format minutes to HH:MM
-// ... (omitted, assuming it stays or I don't touch it since I am targeting the block)
 
-// Remove filesystem include/namespace
 
-// Helper to format minutes to HH:MM
-// (Make sure to duplicate if I am replacing the block containing it)
-// Actually, I can just replace the include lines and the function body.
-
-void generateOutputFiles(const std::vector<Route> &solution, const std::vector<Vehicle> &vehicles, const std::vector<Employee> &emp)
+void generateOutputFiles(const std::vector<Route> &solution, const std::vector<Vehicle> &vehicles, const std::vector<Employee> &emp,const Metadata& meta)
 {
     std::string vPath = "output_vehicle.csv";
     std::string ePath = "output_employees.csv";
 
-    // Force output to current directory
-    // We removed the logic that checks for parent directory to avoid confusion with stale files.
+
 
     std::ofstream vFile(vPath);
     std::ofstream eFile(ePath);
@@ -198,21 +191,21 @@ void generateOutputFiles(const std::vector<Route> &solution, const std::vector<V
             double tOff = (dOff / v.speed) * 60.0;
 
             double arrival = currT + tOff;
-            std::string dropTimeStr = formatTime(arrival); // Drop time = Arrival at office
+            std::string dropTimeStr = formatTime(arrival); 
 
-            currT = arrival; // Drop service (removed)
+            currT = arrival; 
 
-            // Write records
+    
             for (auto &item : batch)
             {
                 int eId = item.first;
                 std::string pickTimeStr = item.second;
                 std::string origId = emp[eId].originalId;
 
-                // Write to Vehicle CSV
+              
                 vFile << v.originalId << "," << cat << "," << origId << "," << pickTimeStr << "," << dropTimeStr << "\n";
 
-                // Write to Employee CSV
+             
                 eFile << origId << "," << pickTimeStr << "," << dropTimeStr << "\n";
             }
 
@@ -223,7 +216,7 @@ void generateOutputFiles(const std::vector<Route> &solution, const std::vector<V
 
         for (int eId : r.seq)
         {
-            // Check fits (logic replication)
+            
             bool fits = true;
             if (batch.size() + 1 > v.seatCap)
                 fits = false;
@@ -238,36 +231,29 @@ void generateOutputFiles(const std::vector<Route> &solution, const std::vector<V
                 }
             }
 
-            // Replicate Feasibility Logic Split
-            // We need separate batch list to check "fits"
+         
             std::vector<int> currentBatchIds;
             for (auto &p : batch)
                 currentBatchIds.push_back(p.first);
 
-            // Simplified check: Just utilize the split logic from before
-            // If main loop decided to split, we must split.
-            // But we don't have the "split" info in Route.
-            // We rely on "re-simulation".
-            // The simulation in `printRouteTrace` splits if `!checkBatchFits`.
-            // We must use EXACTLY that logic.
+         
 
-            if (!checkBatchFits(currentBatchIds, eId, v, emp, t, cx, cy))
+            if (!checkBatchFits(currentBatchIds, eId, v, emp, t, cx, cy,meta))
             {
-                // DROP
+                
                 processBatch(t, cx, cy);
 
-                // Drive to E from Office
+              
                 double d = distKm(cx, cy, emp[eId].x, emp[eId].y);
                 t += (d / v.speed) * 60.0;
             }
             else
             {
-                // Drive to E from Current
+              
                 double d = distKm(cx, cy, emp[eId].x, emp[eId].y);
                 t += (d / v.speed) * 60.0;
             }
 
-            // Pickup
             double startService = std::max(t, emp[eId].ready);
             std::string pickTimeStr = formatTime(startService);
 
@@ -278,7 +264,6 @@ void generateOutputFiles(const std::vector<Route> &solution, const std::vector<V
             batch.push_back({eId, pickTimeStr});
         }
 
-        // Final drop
         if (!batch.empty())
         {
             processBatch(t, cx, cy);
@@ -289,6 +274,28 @@ void generateOutputFiles(const std::vector<Route> &solution, const std::vector<V
     eFile.close();
     std::cout << "Generated output_vehicle.csv and output_employees.csv\n";
 }
+
+int getVehRank(const std::string& pref) {
+    if (pref == "premium") return 0; // Highest priority
+    if (pref == "any")     return 1;
+    return 2;                       // "normal" or anything else
+}
+
+void sortEmployees(std::vector<Employee>& emp) {
+    std::sort(emp.begin(), emp.end(), [](const Employee& a, const Employee& b) {
+        int rankA = getVehRank(a.vehiclePref);
+        int rankB = getVehRank(b.vehiclePref);
+        
+        if (rankA != rankB) {
+            return rankA < rankB;
+        }
+        // Optional: Secondary sort by ID to keep the sort stable/predictable
+        return a.id < b.id; 
+    });
+}
+
+
+
 
 int main(int argc, char **argv)
 {
@@ -310,7 +317,22 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    auto solution = solveALNS(employees, vehicles);
+    Metadata meta;
+    if(argc>=4)  meta = readMetadata(argv[3]);
+    else std::cout<<"Using default values for metadata which are of test case 1\n";
+
+
+    // sorting resulted in vain
+//     sortEmployees(employees);
+//     std::sort(vehicles.begin(), vehicles.end(), [](const Vehicle& a, const Vehicle& b) {
+//     if (a.premium != b.premium) {
+//         return a.premium > b.premium; // true (1) comes before false (0)
+//     }
+//     else if (a.startTime!=b.startTime) return a.startTime < b.startTime; // Secondary sort to keep it deterministic
+//     else return a.id < b.id;
+// });
+
+    auto solution = solveALNS(employees, vehicles, meta);
 
     double totalCost = 0;
     double globalDist = 0;
@@ -328,14 +350,17 @@ int main(int argc, char **argv)
         }
 
         double d = 0, time = 0;
-        printRouteTrace(r, vehicles[r.vehicleId], employees, d, time);
+        printRouteTrace(r, vehicles[r.vehicleId], employees, d, time,meta);
 
         globalDist += d;
         globalTime += time;
         globalMoneyCost += d * vehicles[r.vehicleId].costPerKm;
 
+        std::cout << " [Debug: Dist=" << d << " km, CostPerKm=" << vehicles[r.vehicleId].costPerKm 
+                  << ", RouteCost=" << d * vehicles[r.vehicleId].costPerKm << "]";
+
         std::cout << "\n";
-        totalCost += routeCost(r, vehicles[r.vehicleId], employees);
+        totalCost += routeCost(r, vehicles[r.vehicleId], employees, meta);
     }
     std::cout << "Total Cost (Optimization Score): " << totalCost << "\n";
 
@@ -344,14 +369,16 @@ int main(int argc, char **argv)
     std::cout << "Total Travel Cost (Money): " << globalMoneyCost << "\n";
     std::cout << "Total Time (min): " << globalTime << "\n";
 
-    // 0.7 * Money + 0.3 * Time
-    double objective = globalMoneyCost * 0.7 + globalTime * 0.3;
-    std::cout << "Custom Objective (0.7*Money + 0.3*Time): " << objective << "\n";
+   
+    double objective = globalMoneyCost * meta.objectiveCostWeight + globalTime * meta.objectiveTimeWeight;
+    std::cout << "Custom Objective (w1*Money + w2*Time): " << objective << "\n";
 
-    generateOutputFiles(solution, vehicles, employees);
+    generateOutputFiles(solution, vehicles, employees,meta);
     auto stop = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << "Time taken: " << duration.count() << " ms" << std::endl;
 }
     
+
+
