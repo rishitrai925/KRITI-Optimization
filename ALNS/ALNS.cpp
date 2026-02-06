@@ -19,7 +19,8 @@ struct SolutionState {
 
 std::vector<Route> solveALNS(
     const std::vector<Employee>& emp,
-    const std::vector<Vehicle>& veh)
+    const std::vector<Vehicle>& veh,
+    const Metadata& meta)
 {
     std::mt19937 rng(7);
 
@@ -28,18 +29,17 @@ std::vector<Route> solveALNS(
     for (const auto& v : veh)
         initialSol.push_back({v.id, {}});
 
-    greedyRepair(initialSol, emp, veh);
+    greedyRepair(initialSol, emp, veh, meta);
 
     double initialCost = 0.0;
     for (const auto& r : initialSol)
-        initialCost += routeCost(r, veh[r.vehicleId], emp);
+        initialCost += routeCost(r, veh[r.vehicleId], emp, meta);
 
     // ------------------ Initialize Pool ------------------
     const int POOL_SIZE = 5;
     std::vector<SolutionState> pool;
     
     // Fill pool with clones of initial solution
-    // (Ideally we would diversify, but ALNS will diverge them quickly)
     for(int i=0; i<POOL_SIZE; ++i) {
         pool.push_back({initialSol, initialCost});
     }
@@ -47,13 +47,6 @@ std::vector<Route> solveALNS(
     SolutionState bestGlobal = pool[0];
 
     // ------------------ ALNS parameters ------------------
-    // Temperature for SA acceptance (still use SA for "accept into pool"?)
-    // Or just simple greedy acceptance into pool.
-    // User requested: "store that state for some iters".
-    // We'll stick to: Accept if better than Worst in Pool.
-    // PLUS: Simulated Annealing to accept "bad" moves locally before checking pool?
-    // Let's simplify: Standard ALNS operating on a pool member.
-    // Acceptance = Update Pool.
     
     enum DestroyOp { RAND_D, WORST_D, VEHICLE_D, TIMEWIN_D };
     enum RepairOp  { GREEDY_R, RANDOM_R, REGRET_R };
@@ -61,20 +54,17 @@ std::vector<Route> solveALNS(
     std::vector<OperatorStats> dStats(4);
     std::vector<OperatorStats> rStats(3);
     
-    // T for SA is less relevant if we just rely on pool diversity, 
-    // but useful for accepting moves that don't improve the *specific* parent
-    // yet might improve the pool eventually.
     double T = 1000.0;
 
     // ------------------ Main loop ------------------
-    for (int it = 0; it < 5000; it++) {
-        
-        // 1. Select Parent from Pool (Randomly)
+    int tot_it =50000;
+    for (int it = 1; it < tot_it; it++) {
+    
         int pIdx = std::uniform_int_distribution<>(0, POOL_SIZE - 1)(rng);
-        SolutionState cur = pool[pIdx]; // Copy
+        SolutionState cur = pool[pIdx];
         auto next = cur.sol;
 
-        // ----- Select operators (adaptive) -----
+        
         int d = selectOperator(
             { dStats[0].weight, dStats[1].weight,
               dStats[2].weight, dStats[3].weight }, rng);
@@ -82,27 +72,33 @@ std::vector<Route> solveALNS(
         int r = selectOperator(
             { rStats[0].weight, rStats[1].weight,
               rStats[2].weight }, rng);
-
-        // ----- Destroy -----
-        if (d == RAND_D) randomDestroy(next, 2);
-        else if (d == WORST_D) worstCostDestroy(next, 2);
+        
+        double k1=0.10;
+              if(it<(int)(0.04* tot_it)) k1=0.20;
+              else if(it<(int)(0.15*tot_it)) k1=0.15;
+              else if(it<(int)(0.9*tot_it)) k1=0.1;
+              else k1=0.05;
+        int k2 = it<(tot_it/1.01) ? 2 : 1;
+        int q = std::max(k2, static_cast<int>(k1 * emp.size()));
+        if (d == RAND_D) randomDestroy(next,q );    
+        else if (d == WORST_D) worstCostDestroy(next, q);
         else if (d == VEHICLE_D) vehicleDestroy(next);
-        else timeWindowDestroy(next, emp, veh);
+        else timeWindowDestroy(next, emp, veh, meta);
 
-        // ----- Repair -----
-        if (r == GREEDY_R) greedyRepair(next, emp, veh);
-        else if (r == RANDOM_R) randomRepair(next, emp, veh);
-        else regretRepair(next, emp, veh);
 
-        // ----- Cost evaluation -----
+        if (r == GREEDY_R) greedyRepair(next, emp, veh, meta);
+        else if (r == RANDOM_R) randomRepair(next, emp, veh, meta);
+        else regretRepair(next, emp, veh, meta, q); 
+
+
         double nextCost = 0.0;
         for (const auto& rt : next)
-            nextCost += routeCost(rt, veh[rt.vehicleId], emp);
+            nextCost += routeCost(rt, veh[rt.vehicleId], emp, meta);
 
         // ----- Reward computation -----
         double reward = 0.0;
         
-        // Check Global Best
+ 
         if (nextCost < bestGlobal.cost) {
             bestGlobal = {next, nextCost};
             reward = 5.0;
@@ -115,7 +111,7 @@ std::vector<Route> solveALNS(
         }
 
         // ----- Pool Update Logic -----
-        // Find Worst in Pool
+
         int worstIdx = -1;
         double worstCost = -1.0;
         for(int i=0; i<POOL_SIZE; ++i) {
@@ -127,38 +123,24 @@ std::vector<Route> solveALNS(
         
         bool accept = false;
         
-        // If better than worst, replace worst
+
         if (nextCost < worstCost) {
             accept = true;
-            // Basic diversity check: Don't add if EXACTLY same cost as existing (cheap check)
-            // (Skipped for simplicity, but recommended)
             pool[worstIdx] = {next, nextCost};
         } else {
-             // SA Acceptance for "Storing" it even if worse than worst?
-             // If we do that, we kill a better solution.
-             // Maybe we operate on a temporary 'cur' and only push to pool if good?
-             // Standard Population ALNS: Update pool if quality sufficient.
-             // SA is typically used to accept `next` as the new `cur` for the *next* iteration
-             // of that specific "walker".
-             // Since we pick random walker each time, updating the pool IS the acceptance.
-             
-             // Maybe we replace Randomly if SA passes? 
-             // That preserves diversity.
+
              double diff = nextCost - cur.cost; // compare to parent
              if (T > 1e-6) {
                  double p = std::exp(-diff / T);
                  if (p > std::uniform_real_distribution<>(0.0, 1.0)(rng)) {
-                     // Accepted via SA even though not strictly better than worst?
-                     // If we replace worst, we improve overall pool quality.
-                     // If we replace parent, we just mutate that walker.
-                     // Let's replace Parent in pool to evolve that walker.
+
                      pool[pIdx] = {next, nextCost};
                      accept = true;
                  }
              }
         }
 
-        // ----- Update operator stats -----
+
         dStats[d].score += reward;
         rStats[r].score += reward;
         dStats[d].uses++;
@@ -167,8 +149,7 @@ std::vector<Route> solveALNS(
         // ----- Cooling -----
         T *= 0.999;
 
-        // ----- Adaptive weight update -----
-        if (it % 50 == 0) {
+        if (it % 100 == 0) {
             for (auto& o : dStats) {
                 if (o.uses > 0) {
                     o.weight = 0.8 * o.weight + 0.2 * (o.score / o.uses);
@@ -189,3 +170,4 @@ std::vector<Route> solveALNS(
 
     return bestGlobal.sol;
 }
+
