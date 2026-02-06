@@ -35,14 +35,14 @@ Once compiled, run the executable directly from the terminal. You must provide t
 
 **Windows (PowerShell/CMD):**
 ```powershell
-.\main_ALNS.exe ..\tc_v1.csv ..\tc_emp1.csv ..\tc_meta1.csv ..\dist.txt
+.\ALNS\main_ALNS.exe ..\tc_v1.csv ..\tc_emp1.csv ..\tc_meta1.csv ..\dist.txt
 
 ```
 
 **macOS / Linux (Bash/Zsh):**
 
 ```bash
-./main_ALNS.exe ../tc_v1.csv ../tc_emp1.csv ../tc_meta1.csv ../dist.txt
+./ALNS/main_ALNS.exe ../tc_v1.csv ../tc_emp1.csv ../tc_meta1.csv ../dist.txt
 
 ```
 
