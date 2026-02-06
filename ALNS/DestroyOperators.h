@@ -8,6 +8,8 @@
 void randomDestroy(std::vector<Route>&, int q);
 void worstCostDestroy(std::vector<Route>&, int q);
 void vehicleDestroy(std::vector<Route>&);
+#include "CSVReader.h"
 void timeWindowDestroy(std::vector<Route>&,
                        const std::vector<Employee>&,
-                       const std::vector<Vehicle>&);
+                       const std::vector<Vehicle>&,
+                       const Metadata&);
