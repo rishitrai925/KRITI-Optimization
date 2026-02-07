@@ -9,6 +9,8 @@
 #include <thread>
 #include <mutex>
 #include <iomanip>
+#include <random>
+#include <filesystem>
 
 using json = nlohmann::json;
 using Matrix = std::vector<std::vector<double>>; // Define Matrix Type
@@ -38,9 +40,50 @@ std::vector<std::string> splitLine(const std::string &line) {
     return out;
 }
 
+// stuff for temp dir creation and cleanup
+
+namespace fs = std::filesystem;
+
+std::string generate_uuid()
+{
+    static std::mt19937_64 rng{std::random_device{}()};
+    static std::uniform_int_distribution<uint64_t> dist;
+
+    std::stringstream ss;
+    ss << std::hex << dist(rng);
+    return ss.str();
+}
+
+fs::path create_request_tmp_dir()
+{
+    fs::path base = "tmp";
+    fs::create_directories(base);
+
+    std::string id = "req_" + generate_uuid();
+    fs::path reqDir = base / id;
+
+    fs::create_directory(reqDir);
+    return reqDir;
+}
+
+void cleanup_tmp_dir(const fs::path& dir)
+{
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+}
+
+// struct to ensure temp directories are cleaned up after use, even if exceptions occur
+struct TempDirGuard {
+    fs::path dir;
+    ~TempDirGuard() {
+        cleanup_tmp_dir(dir);
+    }
+};
+
+
 /* ===================== STEP 1: MATRIX GENERATION ===================== */
 // Generates 'matrix.txt' AND populates the in-memory 'outMatrix' vector
-json generate_matrix_file(const std::string& empData, const std::string& vehData, Matrix& outMatrix) {
+json generate_matrix_file(const std::string& empData, const std::string& vehData, Matrix& outMatrix, const fs::path& reqDir) {
     json result;
     std::vector<std::pair<double, double>> coords;
 
@@ -102,7 +145,7 @@ json generate_matrix_file(const std::string& empData, const std::string& vehData
         std::cout << "[Backend] Fetching Matrix..." << std::endl;
     }
     
-    int ret = std::system(("curl -s \"" + url + "\" -o osrm_raw.json").c_str());
+    int ret = std::system(("curl -s \"" + url + "\" -o " + (reqDir / "osrm_raw.json").string()).c_str());
 
     if (ret != 0) {
         result["status"] = "error";
@@ -111,13 +154,13 @@ json generate_matrix_file(const std::string& empData, const std::string& vehData
     }
 
     // 5. Parse JSON, Write File, AND Fill Vector
-    std::ifstream jsonFile("osrm_raw.json");
+    std::ifstream jsonFile((reqDir / "osrm_raw.json").string());
     json j;
     try {
         jsonFile >> j;
         if (!j.contains("distances")) throw std::runtime_error("No distances in OSRM response");
 
-        std::ofstream txtOut("matrix.txt");
+        std::ofstream txtOut((reqDir / "matrix.txt").string());
         auto matrixJson = j["distances"];
         
         // Clear internal vector to be safe
@@ -164,11 +207,11 @@ struct SolverResult {
     std::string output_employee;
 };
 
-SolverResult run_solver(std::string folder, std::string execName, std::string args) {
+SolverResult run_solver(std::string folder, std::string execName, std::string args, fs::path reqDir) {
     SolverResult res;
     
-    std::string logFile = "run_log.txt";
-    std::string command = "cd " + folder + " && ./" + execName + " " + args + " > " + logFile;
+    std::string logFile = (reqDir / folder / "run_log.txt").string();
+    std::string command = "cd " + folder + " && ./" + execName + " " + args + " > ../" + logFile;
 
     {
         std::lock_guard<std::mutex> lock(log_mutex);
@@ -177,9 +220,9 @@ SolverResult run_solver(std::string folder, std::string execName, std::string ar
 
     int returnCode = std::system(command.c_str());
 
-    res.logs = readFile(folder + "/" + logFile);
-    res.output_vehicle = readFile(folder + "/output_vehicle.csv");
-    res.output_employee = readFile(folder + "/output_employees.csv");
+    res.logs = readFile(logFile);
+    res.output_vehicle = readFile(reqDir / folder / "output_vehicle.csv");
+    res.output_employee = readFile(reqDir / folder / "output_employees.csv");
     
     if (returnCode != 0) res.status = "error";
     else if (res.output_vehicle.empty()) res.status = "no_output";
@@ -220,32 +263,46 @@ int main() {
             return crow::response(400, "Missing one of the 3 CSVs.");
         }
 
+        fs::path reqDir = create_request_tmp_dir();
+        TempDirGuard guard{reqDir}; // Uncomment if you want automatic cleanup after request handling
+        std::cerr << "Created temp directory: " << reqDir << std::endl;
+        fs::path base = reqDir / "ALNS";
+        fs::create_directories(base);
+        base = reqDir / "Clustering-Routing-DP-Solver";
+        fs::create_directories(base);
+        base = reqDir / "Heterogeneous_DARP";
+        fs::create_directories(base);
+        // base = reqDir / "Variable_Neighbourhood_Search-KRITI";
+        // fs::create_directories(base);
+
+
         // 2. Save Raw Inputs
-        saveFile("fvehicles.csv", vehData);
-        saveFile("femployees.csv", empData);
-        saveFile("fmetadata.csv", metaData);
-        // saveFile("fbaseline.csv", baseData);
+        saveFile((reqDir / "employees.csv").string(), empData);
+        saveFile((reqDir / "vehicles.csv").string(), vehData);
+        saveFile((reqDir / "metadata.csv").string(), metaData);
+        // saveFile((reqDir / "baseline.csv").string(), baseData);
 
         // 3. GENERATE MATRIX (File + Vector)
         Matrix internal_matrix; // This will hold your matrix in C++ memory
-        
-        json matrix_status = generate_matrix_file(empData, vehData, internal_matrix);
-        
+        const std::string matrixPath = (reqDir / "matrix.txt").string();
+        json matrix_status = generate_matrix_file(empData, vehData, internal_matrix, reqDir);
+    
         if (matrix_status["status"] == "error") {
             return crow::response(500, "Matrix Calculation Failed: " + matrix_status["message"].get<std::string>());
         }
 
         // 4. RUN ALGORITHMS (Parallel)
-        // ARGUMENT ORDER: vehicles -> employees -> metadata -> baseline -> matrix
-        std::string args = "../fvehicles.csv ../femployees.csv ../fmetadata.csv ../matrix.txt";
+        // ARGUMENT ORDER: vehicles -> employees -> metadata -> matrix
+        std::string args = "../"+reqDir.string();
         
         SolverResult alns_res, bac_res, crds_res, hd_res, vnsk_res;
-        
-        std::thread t1([&](){ alns_res = run_solver("ALNS", "main_ALNS", args); });
-        // std::thread t2([&](){ bac_res = run_solver("Branch-And-Cut", "main_BAC", args); });
-        std::thread t3([&](){ crds_res = run_solver("Clustering-Routing-DP-Solver", "crdp", args); });
-        std::thread t4([&](){ hd_res = run_solver("Heterogeneous_DARP", "hetero", args); });
-        // std::thread t5([&](){ vnsk_res = run_solver("Variable_Neighbourhood_Search-KRITI", "main_vns", args); });
+       
+
+        std::thread t1([&](){ alns_res = run_solver("ALNS", "main_ALNS", args, reqDir); });
+        // std::thread t2([&](){ bac_res = run_solver("Branch-And-Cut", "main_BAC", args, reqDir); });
+        std::thread t3([&](){ crds_res = run_solver("Clustering-Routing-DP-Solver", "crdp", args, reqDir); });
+        std::thread t4([&](){ hd_res = run_solver("Heterogeneous_DARP", "hetero", args, reqDir); });
+        // std::thread t5([&](){ vnsk_res = run_solver("Variable_Neighbourhood_Search-KRITI", "main_vns", args, reqDir); });
 
         t1.join();
         // t2.join();

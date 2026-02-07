@@ -598,16 +598,16 @@ vector<Vehicle> loadVehicles(string filename) {
  */
 int main(int argc, char **argv)
 {
-    if (argc < 5)
+    if (argc < 2)
     {
-        cerr << "Usage: ./program vehicles.csv employees.csv metadata.csv matrix.txt\n";
+        cerr << "Usage: ./program directory\n";
         return 1;
     }
 
-    string vehicle_file = argv[1];
-    string employee_file = argv[2];
-    string metadata_file = argv[3];
-    string matrix_file = argv[4];
+    string vehicle_file = argv[1] + string("/vehicles.csv");
+    string employee_file = argv[1] + string("/employees.csv");
+    string metadata_file = argv[1] + string("/metadata.csv");
+    string matrix_file = argv[1] + string("/matrix.txt");
 
 
     // Load metadata
@@ -824,7 +824,8 @@ loadMatrix(matrix_file, matrix_size);
 
     // Write CSVs
     {
-        ofstream fout("output_vehicle.csv");
+        ofstream fout(std::string(argv[1]) + "/Clustering-Routing-DP-Solver/output_vehicle.csv");
+        cout << "\nGenerating CSV files in " << std::string(argv[1]) + "/Clustering-Routing-DP-Solver/\n";
         fout << "vehicle_id,category,employee_id,pickup_time,drop_time\n";
         for (auto &r : csv_rows_vehicle)
             fout << get<0>(r) << "," << get<1>(r) << ","
@@ -833,7 +834,7 @@ loadMatrix(matrix_file, matrix_size);
     }
 
     {
-        ofstream fout("output_employees.csv");
+        ofstream fout(std::string(argv[1]) + "/Clustering-Routing-DP-Solver/output_employees.csv");
         fout << "employee_id,pickup_time,drop_time\n";
         for (auto &r : csv_rows_employee)
             fout << get<0>(r) << ","

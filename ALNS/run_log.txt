@@ -10,4 +10,4 @@ Total Time (min): 71.1927
 Custom Objective (w1*Money + w2*Time): 423.651
 Writing outputs to: output_vehicle.csv
 Generated output_vehicle.csv and output_employees.csv
-Time taken: 298 ms
+Time taken: 260 ms

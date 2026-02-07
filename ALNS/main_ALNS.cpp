@@ -152,10 +152,10 @@ std::string formatTime(double mins)
 
 
 
-void generateOutputFiles(const std::vector<Route> &solution, const std::vector<Vehicle> &vehicles, const std::vector<Employee> &emp,const Metadata& meta)
+void generateOutputFiles(const std::vector<Route> &solution, const std::vector<Vehicle> &vehicles, const std::vector<Employee> &emp,const Metadata& meta, std::string dir)
 {
-    std::string vPath = "output_vehicle.csv";
-    std::string ePath = "output_employees.csv";
+    std::string vPath = dir + "/ALNS/output_vehicle.csv";
+    std::string ePath = dir + "/ALNS/output_employees.csv";
 
 
 
@@ -282,14 +282,18 @@ int main(int argc, char **argv)
 
     auto start = std::chrono::high_resolution_clock::now(); 
 
-    if (argc < 3)
+    if (argc < 2)
     {
-        std::cerr << "Usage: ./vrp <vehicle_csv> <employee_csv>\n";
+        std::cerr << "Usage: ./main_ALNS directory\n";
         return 1;
     }
 
-    auto vehicles = readVehicles(argv[1]);
-    auto employees = readEmployees(argv[2]);
+    auto vehicles = readVehicles(argv[1] + std::string("/vehicles.csv"));
+    auto employees = readEmployees(argv[1] + std::string("/employees.csv"));
+
+     if (vehicles.empty()) {
+        std::cerr << "Error: No vehicles loaded from " << argv[1] << "/vehicles.csv\n";
+    }           
 
     if (vehicles.empty() || employees.empty())
     {
@@ -299,8 +303,13 @@ int main(int argc, char **argv)
 
     Metadata meta;
 
-    if(argc>=4)  meta = readMetadata(argv[3]);
-    readDist(argv[4],(int)(employees.size()+vehicles.size())+1);
+    if(argc >= 2 )  meta = readMetadata(argv[1] + std::string("/metadata.csv"));
+    else {
+        std::cerr << "Warning: No metadata provided. Using default values.\n";
+        meta.objectiveCostWeight = 1.0;
+        meta.objectiveTimeWeight = 1.0;
+    }
+    readDist(argv[1] + std::string("/matrix.txt"),(int)(employees.size()+vehicles.size())+1);
     int idx=0;
     for(int i=0;i<employees.size();i++){
         mappy[{employees[i].x,employees[i].y}]=idx++;
@@ -351,7 +360,7 @@ int main(int argc, char **argv)
     double objective = globalMoneyCost * meta.objectiveCostWeight + globalTime * meta.objectiveTimeWeight;
     std::cout << "Custom Objective (w1*Money + w2*Time): " << objective << "\n";
 
-    generateOutputFiles(solution, vehicles, employees,meta);
+    generateOutputFiles(solution, vehicles, employees,meta, argv[1]);
     auto stop = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);

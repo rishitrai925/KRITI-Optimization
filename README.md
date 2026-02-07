@@ -1,3 +1,21 @@
+# What's changed?
+earlier the files recieved from frontend was being saved at project root dir with a fixed filename, so if we send multiple request at same time it would cause error. fixed it by creating a temp directory with a uuid for each requests and saving its data in that folder which cleans up automatically when process ends. also instead of passing 4 args to each executable. now we send only one which is the path of the temp dir for that request. and we can get files from there as they have predefined file name. For eg..
+
+tmp/req_1234/ \
+employees.csv \
+vehichles.csv \
+metadata.csv \
+matrix.txt 
+
+- Also now the output for each request created by different algos are being saved in the temp dir for that request only. i have made the required changes to ALNS, CRDP, and HDARP. instead of saving the output to their own directory they create and save them in temp directory. same goes for log files
+
+- the other 2 algos still need work, so they remain.
+
+- go through the changes and check if some work is needed. *make sure to remove the warnings in the algo which are raised when the argc<4, and adjust other stuff like that*
+
+
+
+
 # Steps to build and run the server:
 - first clone the repo
 - run make command in the repo directory

@@ -572,20 +572,20 @@ public:
 // ==========================================
 
 int main(int argc, char **argv) {
-    if (argc < 5) {
-        cerr << "Usage: " << argv[0] << " <vehicles.csv> <requests.csv> <metadata.csv> <matrix.txt>" << endl;
+    if (argc < 2) {
+        cerr << "Usage: " << argv[0] << " directory" << endl;
         return 1;
     }
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
     Config config;
-    cout << "Loading metadata from " << argv[3] << "..." << endl;
-    loadMetadata(argv[3], config);
+    cout << "Loading metadata from " << argv[1] << "/metadata.csv..." << endl;
+    loadMetadata(argv[1] + string("/metadata.csv"), config);
 
     cout << "Loading data..." << endl;
-    vector<Vehicle> vehicles = loadVehicles(argv[1]);
-    vector<Request> requests = loadRequests(argv[2], config.max_delays);
+    vector<Vehicle> vehicles = loadVehicles(argv[1] + string("/vehicles.csv"));
+    vector<Request> requests = loadRequests(argv[1] + string("/employees.csv"), config.max_delays);
 
     if (requests.empty() || vehicles.empty()) {
         cerr << "Error: No data loaded. Exiting." << endl;
@@ -597,8 +597,8 @@ int main(int argc, char **argv) {
     V = vehicles.size();
     int matrix_size = N + V + 1; // Emp + Veh + Office
 
-    cout << "Loading matrix from " << argv[4] << " (Expecting " << matrix_size << "x" << matrix_size << ")..." << endl;
-    loadMatrix(argv[4], matrix_size);
+    cout << "Loading matrix from " << argv[1] << "/matrix.txt (Expecting " << matrix_size << "x" << matrix_size << ")..." << endl;
+    loadMatrix(argv[1] + string("/matrix.txt"), matrix_size);
 
     cout << "=== Running VNS Solver ===" << endl;
     VNSSolver solver(requests, vehicles, config);
@@ -610,9 +610,10 @@ int main(int argc, char **argv) {
     cout << "Iterations: " << iterations_done << endl;
     
     cout << "Generating CSV files..." << endl;
-    ofstream emp_file("output_employees.csv");
-    ofstream veh_file("output_vehicle.csv");
-
+    ofstream emp_file(string(argv[1]) + string("/Heterogeneous_DARP/output_employees.csv"));
+    ofstream veh_file(string(argv[1]) + string("/Heterogeneous_DARP/output_vehicle.csv"));
+    cout << "Writing to: " << string(argv[1]) + string("/Heterogeneous_DARP/output_employees.csv") << endl;
+    cout << "Writing to: " << string(argv[1]) + string("/Heterogeneous_DARP/output_vehicle.csv") << endl;
     emp_file << "employee_id,pickup_time,drop_time" << endl;
     veh_file << "vehicle_id,category,employee_id,pickup_time,drop_time" << endl;
 
