@@ -6,18 +6,17 @@
 #include <vector>
 #include <string>
 
-int N, V;
+// Global variables for dimensions
+extern int N;
+extern int V;
 
-// matrix storage
+// Matrix storage
 extern std::vector<std::vector<double>> matrix;
 
 // API
 void loadMatrix(const std::string &filename, int size);
-
 int convert(const std::string &a);
 double getDistanceFromMatrix(const std::string &a, const std::string &b);
-int getTravelTimeFromMatrix(const std::string &a,
-                            const std::string &b,
-                            double speed_kmh);
+int getTravelTimeFromMatrix(const std::string &a, const std::string &b, double speed_kmh);
 
 #endif
