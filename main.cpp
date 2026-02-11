@@ -304,17 +304,19 @@ int main()
 
         // 5. Run Algorithms
         // Note: Ensure your external programs (main_ALNS, etc.) accept the directory path as the first argument!
-        SolverResult alns_res, bac_res, crds_res, hd_res;
+        SolverResult alns_res, bac_res, crds_res, hd_res, vns_res;
 
         std::thread t1([&](){ alns_res = run_solver("ALNS", "main_ALNS", reqDir); });
         std::thread t2([&](){ bac_res = run_solver("Branch-And-Cut", "main_BAC", reqDir); });
         std::thread t3([&](){ crds_res = run_solver("Clustering-Routing-DP-Solver", "crdp", reqDir); });
         std::thread t4([&](){ hd_res = run_solver("Heterogeneous_DARP", "hetero", reqDir); });
+        std::thread t5([&](){ vns_res = run_solver("Variable_Neighbourhood_Search", "main_vns", reqDir); });
 
         t1.join();
         t2.join();
         t3.join();
         t4.join();
+        t5.join();
         
         // 6. Build Response
         json response;
@@ -347,6 +349,13 @@ int main()
             {"logs", hd_res.logs},
             {"csv_vehicle", hd_res.output_vehicle},
             {"csv_employee", hd_res.output_employee}
+        };
+
+        response["results"]["VNS"] = {
+            {"status", vns_res.status},
+            {"logs", vns_res.logs},
+            {"csv_vehicle", vns_res.output_vehicle},
+            {"csv_employee", vns_res.output_employee}
         };
 
         crow::response res(200, response.dump());
