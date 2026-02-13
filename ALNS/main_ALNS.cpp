@@ -32,7 +32,7 @@ bool checkBatchFits(const std::vector<int> &batch, int nextId, const Vehicle &v,
     double travelMin = (dKm / v.speed) * 60.0;
     double arrival = currentT + travelMin;
     double startService = std::max(arrival, nextE.ready);
-    double depart = startService + 1.0;
+    double depart = startService;
 
     double dDestKm = distKm(nextE.x, nextE.y, nextE.destX, nextE.destY);
     double timeToDest = (dDestKm / v.speed) * 60.0;
