@@ -66,6 +66,35 @@ void cleanup_tmp_dir(const fs::path &dir)
     fs::remove_all(dir, ec);
 }
 
+
+int do_haversine = 0;
+double toRadians(double degree) {
+    return degree * (M_PI / 180.0);
+}
+
+double haversine(double lat1, double lon1, double lat2, double lon2) {
+    // Earth's radius in kilometers
+    const double R = 6371.0; 
+    
+    // If you need Miles, use R = 3958.8;
+
+    // Convert differences to radians
+    double dLat = toRadians(lat2 - lat1);
+    double dLon = toRadians(lon2 - lon1);
+
+    // Convert current latitudes to radians
+    lat1 = toRadians(lat1);
+    lat2 = toRadians(lat2);
+
+    // Apply formula
+    double a = std::pow(std::sin(dLat / 2), 2) + 
+               std::pow(std::sin(dLon / 2), 2) * std::cos(lat1) * std::cos(lat2);
+               
+    double c = 2 * std::atan2(std::sqrt(a), std::sqrt(1 - a));
+
+    return R * c;
+}
+
 struct TempDirGuard
 {
     fs::path dir;
@@ -75,10 +104,9 @@ struct TempDirGuard
     {
         if (active)
             cleanup_tmp_dir(dir);
-    }
-};
-
-int do_haversine = 0;
+        }
+    };
+    
 
 /* ===================== STEP 1: MATRIX GENERATION ===================== */
 json generate_matrix_file(const std::string &empData,
@@ -325,32 +353,6 @@ SolverResult run_solver(std::string folderName, std::string execName, fs::path r
 }
 /* ===================== MAIN SERVER ===================== */
 
-double toRadians(double degree) {
-    return degree * (M_PI / 180.0);
-}
-
-double haversine(double lat1, double lon1, double lat2, double lon2) {
-    // Earth's radius in kilometers
-    const double R = 6371.0; 
-    
-    // If you need Miles, use R = 3958.8;
-
-    // Convert differences to radians
-    double dLat = toRadians(lat2 - lat1);
-    double dLon = toRadians(lon2 - lon1);
-
-    // Convert current latitudes to radians
-    lat1 = toRadians(lat1);
-    lat2 = toRadians(lat2);
-
-    // Apply formula
-    double a = std::pow(std::sin(dLat / 2), 2) + 
-               std::pow(std::sin(dLon / 2), 2) * std::cos(lat1) * std::cos(lat2);
-               
-    double c = 2 * std::atan2(std::sqrt(a), std::sqrt(1 - a));
-
-    return R * c;
-}
 
 int main()
 {
