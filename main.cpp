@@ -402,8 +402,8 @@ int main()
 
         std::ifstream read_metadata("metadata.csv");
         std::string metadata_line;
-        for(size_t i = 0; i < 4; i++) getline(read_metadata, metadata_line);
-        // if(metadata_line=="distance_method,haversine") do_haversine = 1;
+        for(size_t i = 0; i < 5; i++) getline(read_metadata, metadata_line);
+        if(metadata_line=="allow_external_maps,FALSE") do_haversine = 1;
 
         // 4. Generate Matrix
         Matrix internal_matrix; 
