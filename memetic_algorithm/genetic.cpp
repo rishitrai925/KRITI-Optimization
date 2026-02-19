@@ -42,7 +42,7 @@ int getPriorityDelay(int priority)
     return PRIORITY_DELAY[0];
 }
 
-const double INFEASIBILITY_PENALTY = 10000.0;
+double INFEASIBILITY_PENALTY = 10000.0;
 
 // =================== ENUMS & HELPERS ===================
 
@@ -513,7 +513,7 @@ void evaluateImported(Chromosome &chromo,
 {
     int N = persons.size();
     int M = drivers.size();
-
+    // INFEASIBILITY_PENALTY = 0.0;
     chromo.fitness = 0.0;
     chromo.schedule.clear();
 
@@ -569,19 +569,28 @@ void evaluateImported(Chromosome &chromo,
 
         // Penalty
         double penalty = 0.0;
+        const double EPSILON = 5; // Tolerance for floating point precision
+
         for (size_t k = 0; k < customers.size(); k++)
         {
             int pIdx = customers[k];
 
-            if (arrivalOffice > (double)persons[pIdx].late_drop)
-                penalty += INFEASIBILITY_PENALTY * (arrivalOffice - persons[pIdx].late_drop);
+            // 1. Check Late Drop Penalty
+            double allowedLateDrop = (double)persons[pIdx].late_drop + (double)getPriorityDelay(persons[pIdx].priority);
+            if (arrivalOffice > allowedLateDrop + EPSILON)
+            {
+                penalty += INFEASIBILITY_PENALTY * (arrivalOffice - allowedLateDrop);
+                cout << pIdx << " " << penalty << endl;
+            }
 
-            double rideTime = arrivalOffice - pickupTimes[k];
-            double directTime = getTravelTime(personMatId(pIdx), OFFICE_ID, d.speed_kmph);
-            double delay = rideTime - directTime;
-            double allowed = (double)getPriorityDelay(persons[pIdx].priority);
-            if (delay > allowed)
-                penalty += INFEASIBILITY_PENALTY * (delay - allowed);
+            // 2. Check Ride Time Delay Penalty
+            // double rideTime = arrivalOffice - pickupTimes[k];
+            // double directTime = getTravelTime(personMatId(pIdx), OFFICE_ID, d.speed_kmph);
+            // double delay = rideTime - directTime;
+            // double allowed = (double)getPriorityDelay(persons[pIdx].priority);
+
+            // if (delay > allowed + EPSILON)
+            //     penalty += INFEASIBILITY_PENALTY * (delay - allowed);
         }
 
         double totalRideTime = 0.0;
@@ -608,6 +617,7 @@ void evaluateImported(Chromosome &chromo,
     }
 
     chromo.numVehiclesUsed = (int)usedVehicles.size();
+    // INFEASIBILITY_PENALTY = 10000.0;
 }
 
 // =================== SPLIT PROCEDURE ===================
@@ -738,21 +748,26 @@ void splitProcedure(Chromosome &chromo,
                 double arrivalAtOffice = currentVisTime + travelToOffice;
 
                 double penalty = 0.0;
+                const double EPSILON = 1e-5; // Tolerance for floating point precision
+
                 for (int p = i; p < j; p++)
                 {
                     int pIdx = chromo.giantTour[p];
                     double actualPickup = pickupTimes[p - i];
 
-                    if (arrivalAtOffice > (double)persons[pIdx].late_drop)
-                        penalty += INFEASIBILITY_PENALTY * (arrivalAtOffice - persons[pIdx].late_drop);
+                    // 1. Check Late Drop Penalty
+                    double allowedLateDrop = (double)persons[pIdx].late_drop + (double)getPriorityDelay(persons[pIdx].priority);
+                    if (arrivalAtOffice > allowedLateDrop + EPSILON)
+                        penalty += INFEASIBILITY_PENALTY * (arrivalAtOffice - allowedLateDrop);
 
-                    double actualRideTime = arrivalAtOffice - actualPickup;
-                    double directTime = getTravelTime(personMatId(pIdx), OFFICE_ID, d.speed_kmph);
-                    double delay = actualRideTime - directTime;
-                    double allowedDelay = (double)getPriorityDelay(persons[pIdx].priority);
+                    // 2. Check Ride Time Delay Penalty
+                    // double actualRideTime = arrivalAtOffice - actualPickup;
+                    // double directTime = getTravelTime(personMatId(pIdx), OFFICE_ID, d.speed_kmph);
+                    // double delay = actualRideTime - directTime;
+                    // double allowedDelay = (double)getPriorityDelay(persons[pIdx].priority);
 
-                    if (delay > allowedDelay)
-                        penalty += INFEASIBILITY_PENALTY * (delay - allowedDelay);
+                    // if (delay > allowedDelay + EPSILON)
+                    //     penalty += INFEASIBILITY_PENALTY * (delay - allowedDelay);
                 }
 
                 double totalPassengerRideTime = 0.0;
@@ -1067,7 +1082,8 @@ int main(int argc, char *argv[])
         "Branch-And-Cut",
         "god",
         "Heterogeneous_DARP",
-        "Variable_Neighbourhood_Search"};
+        "Variable_Neighbourhood_Search",
+        "Clustering-Routing-DP-Solver"};
 
     cout << "\n[INFO] Loading initial population (exact vehicle assignments preserved)...\n";
     vector<Chromosome> population;
@@ -1120,7 +1136,7 @@ int main(int argc, char *argv[])
     cout << "[INFO] Initial best written to: memetic_algorithm/initial_best_output_vehicle.csv\n\n";
 
     int POP_SIZE = population.size();
-    int GENERATIONS = 200;
+    int GENERATIONS = 2000;
     mt19937 rng(chrono::steady_clock::now().time_since_epoch().count());
 
     auto start_time = chrono::high_resolution_clock::now();

@@ -48,8 +48,8 @@ struct Request
             return true;
 
         if (veh_pref == CATEGORY_NORMAL)
-            return true;
-        // return v_cat == CATEGORY_NORMAL;
+            return v_cat == CATEGORY_NORMAL;
+        // return true;
 
         // If I asked for Premium, I strictly want Premium
         if (veh_pref == CATEGORY_PREMIUM)
