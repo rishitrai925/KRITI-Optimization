@@ -10,6 +10,9 @@
 #include <iomanip>
 #include <limits>
 #include <random>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 using namespace std;
 
@@ -414,12 +417,27 @@ Solution neighborSwap(Solution sol) {
 }
 
 int main(int argc, char **argv) {
-    if(argc < 5) {
-        cerr << "Usage: ./program <vehicles.csv> <employees.csv> <metadata.csv> <matrix.txt>\n";
+    if(argc < 2)
+    {
+        std::cerr << "Usage: " << argv[0] << " <base_directory>\n";
         return 1;
     }
 
     srand(time(0));
+
+    fs::path base_dir = argv[1];
+
+    if(!fs::exists(base_dir))
+    {
+        std::cerr << "Error: Directory does not exist: " << base_dir << "\n";
+        return 1;
+    }
+
+    // 3. Define Input Paths (All inside base_dir)
+    fs::path metadata_path = base_dir / "metadata.csv";
+    fs::path vehicles_path = base_dir / "vehicles.csv";
+    fs::path employees_path = base_dir / "employees.csv";
+    fs::path matrix_path = base_dir / "matrix.txt";
 
     cout << "Loading CSV files..." << endl;
     loadVehicles(argv[1]);
@@ -476,7 +494,8 @@ int main(int argc, char **argv) {
     cout << "Unassigned Requests   : " << best.unassigned.size() << endl;
 
     // --- Output CSVs ---
-    ofstream outFileVeh("vehicle_output.csv");
+    fs::path veh_out_path = base_dir / "Variable_Neighbourhood_Search/output_vehicle.csv";
+    ofstream outFileVeh(veh_out_path);
     outFileVeh << fixed << setprecision(3) << final_obj << "," << final_penalty << endl;
     outFileVeh << "vehicle_id,category,employee_id,pickup_time,drop_time" << endl;
 
@@ -523,7 +542,8 @@ int main(int argc, char **argv) {
     }
     outFileVeh.close();
 
-    ofstream outFileEmp("employee_output.csv");
+    fs::path emp_out_path = base_dir / "Variable_Neighbourhood_Search/output_employees.csv";
+    ofstream outFileEmp(emp_out_path);
     outFileEmp << "employee_id,pickup_time,drop_time" << endl;
     for(const auto &entry : empRecords) {
         outFileEmp << entry.second.emp_id << "," << entry.second.pickup_time << "," << entry.second.drop_time << endl;
