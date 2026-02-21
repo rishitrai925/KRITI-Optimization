@@ -13,7 +13,7 @@ inline bool routeFeasible(const Route& r,
                           const std::vector<Employee>& emp){
 
     if (r.seq.empty()) return true;
-
+   if(v.speed<=0) return false;
     double t = v.startTime;
     double cx = v.x;
     double cy = v.y;
@@ -50,13 +50,13 @@ inline bool routeFeasible(const Route& r,
         double dDestKm = distKm(e.x, e.y, e.destX, e.destY);
         double timeToDest = (dDestKm / v.speed) * 60.0;
         double arrivalAtDest = depart + timeToDest;
-        // Hard constraint: delay > 180 min is infeasible
+        
         double delay = arrivalAtDest - e.due;
-        if (delay > 180.0) return false; 
+        // if (delay > 180.0) return false; 
         if (fits) {
              for (int bid : batch) {
                  double batchDelay = arrivalAtDest - emp[bid].due;
-                 if (batchDelay > 180.0) return false;
+                 // if (batchDelay > 180.0) return false;
              }
         }
 
@@ -73,7 +73,7 @@ inline bool routeFeasible(const Route& r,
             double tOff = (dOff / v.speed) * 60.0;
             t += tOff;
 
-            if (t > v.endTime) return false;
+            // if (t > v.endTime) return false;
             
             batch.clear();
             
@@ -86,13 +86,13 @@ inline bool routeFeasible(const Route& r,
             travelMin = (dKm / v.speed) * 60.0;
             arrival = t + travelMin;
             startService = std::max(arrival, e.ready);
-            depart = startService + 1.0;
+            depart = startService ;
             
             dDestKm = distKm(e.x, e.y, e.destX, e.destY);
             timeToDest = (dDestKm / v.speed) * 60.0;
             arrivalAtDest = depart + timeToDest;
 
-            if (arrivalAtDest > v.endTime) return false; 
+            // if (arrivalAtDest > v.endTime) return false; 
             
             batch.push_back(eId);
             t = depart;
@@ -109,4 +109,5 @@ inline bool routeFeasible(const Route& r,
     
     return true;
 }
+
 
