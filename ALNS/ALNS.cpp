@@ -165,25 +165,21 @@ std::vector<Route> solveALNS(
 
         bool accept = false;
 
-        if (nextCost < worstCost)
-        {
+               if (nextCost < cur.cost) {
+            // Replace parent if improved, moving the trajectory forward
+            pool[pIdx] = {next, nextCost};
             accept = true;
-            pool[worstIdx] = {next, nextCost};
-        }
-        else
-        {
-
-            double diff = nextCost - cur.cost; // compare to parent
-            if (T > 1e-6)
-            {
-                double p = std::exp(-diff / T);
-                if (p > std::uniform_real_distribution<>(0.0, 1.0)(rng))
-                {
-
-                    pool[pIdx] = {next, nextCost};
-                    accept = true;
-                }
-            }
+        } else {
+             // If worse than current, use Simulated Annealing acceptance criteria
+             double diff = nextCost - cur.cost;
+             if (T > 1e-6) {
+                 double p = std::exp(-diff / T);
+                 if (p > std::uniform_real_distribution<>(0.0, 1.0)(rng)) {
+                     // Only replace the worst if accepted but worse than current
+                     pool[worstIdx] = {next, nextCost};
+                     accept = true;
+                 }
+             }
         }
 
         dStats[d].score += reward;
@@ -227,3 +223,4 @@ std::vector<Route> solveALNS(
 
     return bestGlobal.sol;
 }
+
