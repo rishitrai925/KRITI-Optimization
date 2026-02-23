@@ -1,37 +1,49 @@
-# What's changed?
-earlier the files recieved from frontend was being saved at project root dir with a fixed filename, so if we send multiple request at same time it would cause error. fixed it by creating a temp directory with a uuid for each requests and saving its data in that folder which cleans up automatically when process ends. also instead of passing 4 args to each executable. now we send only one which is the path of the temp dir for that request. and we can get files from there as they have predefined file name. For eg..
+# 🚀 Velora Optimization System
 
-tmp/req_1234/ \
-employees.csv \
-vehichles.csv \
-metadata.csv \
-matrix.txt 
+![C++](https://img.shields.io/badge/C++-17%2B-blue.svg) ![Next.js](https://img.shields.io/badge/Next.js-14-black) ![Linux](https://img.shields.io/badge/OS-Ubuntu-orange)
 
-- Also now the output for each request created by different algos are being saved in the temp dir for that request only. i have made the required changes to ALNS, CRDP, and HDARP. instead of saving the output to their own directory they create and save them in temp directory. same goes for log files
+**Velora** is a high-performance, full-stack Multi-Vehicle Employee Transportation Assignment (MVETA) solver developed for the **Kriti Route Optimization Challenge**. It features a "Race to the Best Solution" architecture, orchestrating seven distinct optimization algorithms concurrently to minimize corporate transportation costs and employee commute times.
 
-- the other 2 algos still need work, so they remain.
+## ✨ Key Features
 
-- go through the changes and check if some work is needed. *make sure to remove the warnings in the algo which are raised when the argc<4, and adjust other stuff like that*
+* **Multithreaded Portfolio Architecture:** A C++ backend powered by the Crow microframework dispatches 6 metaheuristic solvers simultaneously via `std::thread`, with a 7th Memetic solver that hybridizes the outputs.
+* **Smart Routing Engine:** Dynamically generates an $N \times N$ distance matrix using network-aware Open Source Routing Machine (OSRM) API calls via parallel block-decomposition, with a robust Haversine fallback.
+* **Penalty-Based Constraint Relaxation:** Navigates complex vehicle capacity, time-window, and sharing preferences using dynamic penalty tuning ($\alpha, \beta, \gamma, \delta$) to escape local optima.
+* **Full-Stack Interactive Frontend:** A Next.js 14 web interface featuring 3D globe visualization (React-Globe.gl) and detailed 2D route mapping (Leaflet.js) to monitor fleet analytics in real-time.
 
+## 🧠 Optimization Solvers
 
+The system deploys seven independent executables, each tackling the routing problem from a unique mathematical approach:
+1. **GOD-VNS:** Variable Neighborhood Search with penalty-steered intra-route repositioning.
+2. **ALNS:** Adaptive Large Neighborhood Search with dynamic destroy/repair weights.
+3. **Branch-and-Cut (BAC):** Regret-based initialization coupled with deterministic annealing.
+4. **Heterogeneous DARP:** Tailored routing for mixed vehicle fleets (Normal/Premium).
+5. **Clustering-Routing DP (CRDS):** A divide-and-conquer approach using divisive hierarchical clustering and Held-Karp Dynamic Programming.
+6. **Standalone VNS:** Fast, constraint-aware local search with greedy best-insertion.
+7. **Memetic Algorithm:** A capstone evolutionary algorithm seeded by the CSV outputs of the prior six solvers, utilizing Order Crossover (OX) on a giant-tour representation.
 
+## 🏗️ System Architecture
 
-# Steps to build and run the server:
-- first clone the repo
-- run make command in the repo directory
-- it may show error regarding asio.h, it is because we are passing flags to use standalone asio source instead of boost lib
-- fix it by running: sudo apt install libasio-dev
-- after the build is completed successfully
-- run the server_app executable
-- the API will be live on port 5555 on your local network
-# Testing the API
-- we gonna test it with curl, we can send request via any other method too
-- make sure the 3 files ( employees.csv, vehicles.csv, metadata.csv ) are present in your working directory
-- NOTE: our api is handling the POST request at localhost:5555/upload
-- run the curl command
-- curl -X POST http://localhost:5555/upload   -F "employees=@employees.csv"   -F "vehicles=@vehicles.csv"   -F "metadata=@metadata.csv"
-- u should get the response (if not then leave it)
-- the logs will be printed in the server terminal
-- respective logs for each algo will be saved in their respective directories
+* **Frontend:** Next.js 14 (App Router), React, Leaflet.js, React-Globe.gl, Framer Motion.
+* **Backend:** C++, Crow HTTP Framework, nlohmann/json.
+* **Inter-Process Communication:** Standardized CSV schema (Employees, Vehicles, Metadata) and UUID-isolated temporary execution directories for thread-safe operations.
 
-# NOTE: this is not the final API, there are some issues which can be fixed
+## ⚙️ Prerequisites & Setup (Ubuntu/Linux)
+
+### Backend Requirements
+* **C++ Compiler:** GCC/G++ supporting C++17 or higher.
+* **CMake:** Build system.
+* **Libraries:** Crow (HTTP server), libcurl (for OSRM requests), nlohmann-json.
+
+```bash
+# Clone the repository
+git clone [https://github.com/your-username/KRITI-Optimization.git](https://github.com/your-username/KRITI-Optimization.git)
+cd KRITI-Optimization
+
+# Build the C++ Backend and Solvers
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+
+# Run the Server (Defaults to port 5555)
+./velora_server
