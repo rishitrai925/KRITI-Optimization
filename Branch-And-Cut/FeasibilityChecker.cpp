@@ -1,15 +1,15 @@
 #include "FeasibilityChecker.h"
 #include "utils.h"
 #include "matrix.h"
-#include <map>
-#include <algorithm> // Required for std::remove
+#include <algorithm>
 
 FeasibilityChecker::FeasibilityChecker(
     const std::vector<Node> &n,
     const std::vector<Request> &r,
-    const std::vector<Vehicle> &U,
+    const std::vector<Vehicle> &v,
     int global_cap,
-    EvaluationMode m) : nodes(n), requests(r), vehicles(U), max_global_capacity(global_cap), mode(m), total_penalty(0) {}
+    EvaluationMode m)
+    : nodes(n), requests(r), vehicles(v), max_global_capacity(global_cap), mode(m), total_penalty(0) {}
 
 bool FeasibilityChecker::checkInsert(
     const std::vector<int> &current_route_ids,
@@ -30,6 +30,9 @@ bool FeasibilityChecker::runEightStepEvaluation(const std::vector<int> &route_id
     total_penalty = 0;
 
     int U = route_ids.size();
+    if (U == 0)
+        return true;
+
     const Vehicle &vehicle = vehicles[veh_idx];
 
     std::vector<int> A(U), D(U), W(U), L(U);
@@ -41,10 +44,10 @@ bool FeasibilityChecker::runEightStepEvaluation(const std::vector<int> &route_id
 
     std::vector<int> active_requests;
 
-    // NEW: Track sharing violations so we only penalize once per passenger
+    // Track sharing violations so we only penalize once per passenger per route evaluation
     std::vector<bool> sharing_penalized(requests.size(), false);
 
-    // Step 2: Forward Pass
+    // Forward Pass
     for (int i = 1; i < U; ++i)
     {
         int prev = route_ids[i - 1];
@@ -52,8 +55,6 @@ bool FeasibilityChecker::runEightStepEvaluation(const std::vector<int> &route_id
         const Node &n_curr = nodes[curr];
         const Node &n_prev = nodes[prev];
 
-        // Fast integer-index lookup: no string allocation or parsing.
-        // getMatrixIndex() maps node type → row/col in the distance matrix directly.
         int travel = 0;
         if (n_curr.type != Node::DUMMY_END)
         {
@@ -66,52 +67,45 @@ bool FeasibilityChecker::runEightStepEvaluation(const std::vector<int> &route_id
         W[i] = std::max(0, n_curr.earliest_time - A[i]);
         int B_i = A[i] + W[i];
 
+        // --- CONSTRAINT 1: Time Windows (SOFT) ---
         if (B_i > n_curr.latest_time)
         {
             if (mode == EvaluationMode::STRICT)
             {
                 return false;
             }
-            else if (mode == EvaluationMode::PENALTY && n_curr.type == Node::DELIVERY)
-            {
-                long long violation = B_i - n_curr.latest_time;
-                total_penalty += avg_speed_per_km * 100 * violation * tm_cost;
-            }
             else
             {
-                return false;
+                long long violation = B_i - n_curr.latest_time;
+                total_penalty += violation * penalty_time_window;
             }
         }
 
         D[i] = B_i + n_curr.service_duration;
         L[i] = L[i - 1] + n_curr.demand;
 
+        // --- CONSTRAINT 2: Physical Vehicle Capacity (STRICT) ---
+        // This will ALWAYS reject the route if capacity is exceeded,
+        // even if we are in PENALTY mode.
         if (L[i] > max_global_capacity)
+        {
             return false;
+        }
 
         if (n_curr.type == Node::PICKUP)
         {
             const Request &r = requests[n_curr.request_id];
 
-            // If it's not strictly compatible (e.g., Premium in Normal)
+            // --- CONSTRAINT 3: Vehicle Compatibility (SOFT) ---
             if (!r.isVehicleCompatible(vehicle.category))
             {
                 if (mode == EvaluationMode::STRICT)
                 {
                     return false;
                 }
-                else if (mode == EvaluationMode::PENALTY)
+                else
                 {
-                    // Downgrade: Premium passenger in a Normal car
-                    if (r.veh_pref == CATEGORY_PREMIUM && vehicle.category == CATEGORY_NORMAL)
-                    {
-                        total_penalty += penalty_premium_vehicle;
-                    }
-                    else
-                    {
-                        // Any other impossible mismatch fails completely
-                        return false;
-                    }
+                    total_penalty += penalty_premium_vehicle;
                 }
             }
             active_requests.push_back(n_curr.request_id);
@@ -122,9 +116,11 @@ bool FeasibilityChecker::runEightStepEvaluation(const std::vector<int> &route_id
             active_requests.erase(it, active_requests.end());
         }
 
+        // Calculate real load for sharing preference evaluation
         int dummy_load = max_global_capacity - vehicle.max_capacity;
         int current_real_load = L[i] - dummy_load;
 
+        // --- CONSTRAINT 4: Ride-Sharing Preferences (SOFT) ---
         for (int req_id : active_requests)
         {
             const Request &r = requests[req_id];
@@ -136,9 +132,8 @@ bool FeasibilityChecker::runEightStepEvaluation(const std::vector<int> &route_id
                 {
                     return false;
                 }
-                else if (mode == EvaluationMode::PENALTY)
+                else
                 {
-                    // Only apply the penalty if we haven't already penalized this specific request
                     if (!sharing_penalized[req_id])
                     {
                         total_penalty += penalty_sharing_preference;
@@ -149,38 +144,14 @@ bool FeasibilityChecker::runEightStepEvaluation(const std::vector<int> &route_id
         }
     }
 
-    // Step 3: Forward Time Slack
+    // Forward Time Slack (Kept for local reference/other operators)
     std::vector<int> F(U);
     F[U - 1] = nodes[route_ids[U - 1]].latest_time - A[U - 1];
-
     for (int i = U - 2; i >= 0; --i)
     {
         const Node &n_curr = nodes[route_ids[i]];
         F[i] = std::min(n_curr.latest_time - (A[i] + W[i]), F[i + 1] + W[i + 1]);
     }
 
-    // Step 4: Duration Checks
-    int total_duration = D[U - 1] - A[0];
-    if (total_duration > 720)
-        return false;
-
-    // std::map<int, int> pickup_indices;
-    // for (int i = 0; i < U; ++i) {
-    //     int node_id = route_ids[i];
-    //     const Node& n = nodes[node_id];
-
-    //     if (n.type == Node::PICKUP) {
-    //         pickup_indices[n.request_id] = i;
-    //     }
-    //     else if (n.type == Node::DELIVERY) {
-    //         if (pickup_indices.find(n.request_id) != pickup_indices.end()) {
-    //             int p_idx = pickup_indices[n.request_id];
-    //             int ride_time = A[i] - D[p_idx];
-    //             int max_allowed = requests[n.request_id].max_ride_time;
-    //             if (ride_time > max_allowed) return false;
-    //         }
-    //     }
-    // }
-
-    return true;
+    return true; // We survived all strict constraints!
 }

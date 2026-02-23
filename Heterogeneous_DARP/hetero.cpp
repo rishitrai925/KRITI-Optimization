@@ -736,19 +736,19 @@ public:
                 cur.sequence.pop_back();
                 cur.sequence.pop_back();
 
-                // if (m.objective_score < base_score + 50000000.0)
-                // {
-                //     if (m.objective_score < best_insertion_cost)
-                //     {
-                //         best_insertion_cost = m.objective_score;
-                //         best_r = r;
-                //     }
-                // }
-                if (m.objective_score < best_insertion_cost)
+                if (m.objective_score < base_score + 50000000.0)
                 {
-                    best_insertion_cost = m.objective_score;
-                    best_r = r;
+                    if (m.objective_score < best_insertion_cost)
+                    {
+                        best_insertion_cost = m.objective_score;
+                        best_r = r;
+                    }
                 }
+                // if (m.objective_score < best_insertion_cost)
+                // {
+                //     best_insertion_cost = m.objective_score;
+                //     best_r = r;
+                // }
             }
 
             if (best_r != -1)
@@ -952,7 +952,7 @@ public:
             auto cur = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = cur - st;
 
-            if (elapsed.count() >= 20)
+            if (elapsed.count() >= 60)
             {
                 break;
             }

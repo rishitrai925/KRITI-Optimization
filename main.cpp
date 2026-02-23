@@ -214,6 +214,7 @@ json generate_matrix_file(const std::string &empData,
                                          std::to_string(srcBlock.front()) + "_" +
                                          std::to_string(dstBlock.front()) + ".json");
 
+<<<<<<< HEAD
             if (!do_haversine) {
                 std::string cmd = "curl -sS \"" + url + "\" -o \"" + tmpJson.string() + "\"";
                 if (std::system(cmd.c_str()) != 0) {
@@ -231,10 +232,52 @@ json generate_matrix_file(const std::string &empData,
                     osrm_failed = true;
                     return;
                 }
+=======
+            std::string cmd = "curl -sS \"" + url + "\" -o \"" + tmpJson.string() + "\"";
 
+            bool osrm_success = false;
+            json j;
+
+            // Only attempt the network call if we aren't forcing Haversine
+            if (!do_haversine)
+            {
+                // If the curl command executed without system-level errors
+                if (std::system(cmd.c_str()) == 0)
+                {
+                    try
+                    {
+                        std::ifstream jf(tmpJson);
+                        jf >> j;
+>>>>>>> 6d7d27a (final hosted)
+
+                        // Verify the JSON actually contains our distance matrix
+                        if (j.contains("distances"))
+                        {
+                            osrm_success = true;
+                        }
+                    }
+                    catch (...)
+                    {
+                        // JSON parsing failed (e.g., empty file, invalid format)
+                        osrm_success = false;
+                    }
+                }
+            }
+
+            // Populate the matrix based on success or fallback
+            if (osrm_success)
+            {
                 auto distances = j["distances"];
+<<<<<<< HEAD
                 for (size_t i = 0; i < srcBlock.size(); ++i) {
                     for (size_t k = 0; k < dstBlock.size(); ++k) {
+=======
+                for (size_t i = 0; i < srcBlock.size(); ++i)
+                {
+                    for (size_t k = 0; k < dstBlock.size(); ++k)
+                    {
+                        // Convert meters to kilometers
+>>>>>>> 6d7d27a (final hosted)
                         outMatrix[srcBlock[i]][dstBlock[k]] =
                             distances[i][k].get<double>() / 1000.0;
                     }
@@ -242,9 +285,18 @@ json generate_matrix_file(const std::string &empData,
             }
             else
             {
+<<<<<<< HEAD
                 // Haversine logic
                 for (size_t i = 0; i < srcBlock.size(); ++i) {
                     for (size_t k = 0; k < dstBlock.size(); ++k) {
+=======
+                // FALLBACK: Execute Haversine if curl failed, JSON was bad,
+                // "distances" was missing, or do_haversine is true.
+                for (size_t i = 0; i < srcBlock.size(); ++i)
+                {
+                    for (size_t k = 0; k < dstBlock.size(); ++k)
+                    {
+>>>>>>> 6d7d27a (final hosted)
                         outMatrix[srcBlock[i]][dstBlock[k]] =
                             haversine(coords[srcBlock[i]].first, coords[srcBlock[i]].second,
                                       coords[dstBlock[k]].first, coords[dstBlock[k]].second);

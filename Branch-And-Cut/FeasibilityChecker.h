@@ -1,9 +1,10 @@
 #ifndef FEASIBILITYCHECKER_H
 #define FEASIBILITYCHECKER_H
 #pragma once
+
 #include "structures.h"
-#include <vector>
 #include "globals.h"
+#include <vector>
 
 enum class EvaluationMode
 {
@@ -25,7 +26,7 @@ public:
         const std::vector<Request> &r,
         const std::vector<Vehicle> &v,
         int global_cap,
-        EvaluationMode m = EvaluationMode::STRICT);
+        EvaluationMode m = EvaluationMode::PENALTY);
 
     bool checkInsert(
         const std::vector<int> &current_route_ids,
@@ -35,7 +36,6 @@ public:
         int pickup_pos,
         int delivery_pos);
 
-    // MOVED TO PUBLIC for optimization access
     bool runEightStepEvaluation(const std::vector<int> &route_ids, int veh_idx);
 
     long long getPenalty() const { return total_penalty; }
@@ -43,9 +43,11 @@ public:
     EvaluationMode mode;
     long long total_penalty;
 
-    // NEW: Separate penalty variables for easy tuning
-    long long penalty_premium_vehicle = 500000;
-    long long penalty_sharing_preference = 500000;
+    // Penalty Multipliers (Tweak these to tell the solver which rules are most important)
+    long long penalty_time_window = 100000;         // Per minute late
+    long long penalty_capacity = 10000000;          // Per passenger over capacity
+    long long penalty_premium_vehicle = 5000000;    // Flat penalty for wrong vehicle type
+    long long penalty_sharing_preference = 5000000; // Flat penalty for violating max_shared_with
 };
 
-#endif
+#endif // FEASIBILITYCHECKER_H
