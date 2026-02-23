@@ -80,10 +80,10 @@ struct Config
     double cost_weight = 1.0;
     double time_weight = 0.0;
 
-    double alpha = 25000.0;
+    double alpha = 5000.0;
     ;                        // Ride Time Penalty
-    double beta = 100000.0;  // Time Window Penalty
-    double gamma = 500000.0; // Capacity/Sharing Penalty
+    double beta = 10000.0;   // Time Window Penalty
+    double gamma = 100000.0; // Capacity/Sharing Penalty
 
     std::vector<int> max_delays = {0, 10, 20, 30, 45, 60};
 };
