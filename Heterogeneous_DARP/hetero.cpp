@@ -240,6 +240,9 @@ std::vector<Vehicle> loadVehicles(const std::string &filename)
             v.capacity = std::stoi(row[3]);
             v.cost_per_km = std::stod(row[4]);
             v.avg_speed_kmph = std::stod(row[5]);
+            if (v.avg_speed_kmph <= 0.0) {
+                continue; 
+            }
             v.current_lat = std::stod(row[6]);
             v.current_lng = std::stod(row[7]);
             v.available_from = timeStringToMin(row[8]);
@@ -688,14 +691,11 @@ public:
                 cur.sequence.pop_back();
                 cur.sequence.pop_back();
 
-                if (m.objective_score < base_score + 50000000.0)
-                {
                     if (m.objective_score < best_insertion_cost)
                     {
                         best_insertion_cost = m.objective_score;
                         best_r = r;
                     }
-                }
             }
 
             if (best_r != -1)
