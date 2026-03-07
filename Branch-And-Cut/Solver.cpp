@@ -32,12 +32,34 @@ double Solver::calculateRouteCost(const std::vector<int> &route_ids, const Vehic
 {
     if (route_ids.empty())
         return 0.0;
-    double total_dist = 0.0;
-    double current_time = std::max((double)v.available_from, (double)graph.nodes[route_ids[0]].earliest_time);
-    // double start_time = current_time;
 
+    double current_time = std::max((double)v.available_from, (double)graph.nodes[route_ids[0]].earliest_time);
+
+    // --- FIX: Delay departure to arrive exactly at the first pickup time ---
+    if (route_ids.size() > 1)
+    {
+        const Node &n_start = graph.nodes[route_ids[0]];
+        const Node &n_first = graph.nodes[route_ids[1]];
+
+        if (n_first.type != Node::DUMMY_END)
+        {
+            double dist = getDistanceByIndex(n_start.getMatrixIndex(), n_first.getMatrixIndex());
+            double speed = (v.avg_speed_kmh > 0) ? v.avg_speed_kmh : 30.0;
+            double travel_time_to_first = (dist / speed) * 60.0;
+
+            // If leaving right now gets us there before the earliest pickup, delay the start
+            if (current_time + travel_time_to_first < n_first.earliest_time)
+            {
+                current_time = n_first.earliest_time - travel_time_to_first;
+            }
+        }
+    }
+    // -----------------------------------------------------------------------
+
+    // double start_time = current_time;
     double total_passenger_travel_time = 0.0;
     std::map<int, double> passenger_boarding_times;
+    double total_dist = 0;
 
     for (size_t i = 0; i < route_ids.size() - 1; ++i)
     {
@@ -137,137 +159,6 @@ void Solver::buildInitialSolution(Solution &sol)
             sol.unserved_requests.push_back(req_idx);
         }
     }
-    sol.total_cost = calculateTotalCost(sol);
-}
-
-// --- REGRET-BASED INITIAL SOLUTION ---
-// Replaces the simple greedy insertion.
-// Complexity: O(N^2 * V * L) - Slower to start, but MUCH better results.
-void Solver::buildRegretSolution(Solution &sol)
-{
-    // 1. Initialize empty routes
-    for (const auto &veh : vehicles)
-    {
-        sol.routes[veh.id] = {1 + (veh.id - 1), graph.n + 1 + (veh.id - 1)};
-    }
-
-    std::vector<int> unserved = sol.unserved_requests; // Initially all requests are here (if any)
-    // Actually, let's just reset and assume all requests need insertion
-    std::vector<int> pending_reqs;
-    for (int i = 0; i < (int)requests.size(); ++i)
-        pending_reqs.push_back(i);
-
-    sol.unserved_requests.clear();
-
-    while (!pending_reqs.empty())
-    {
-        int best_req_to_insert = -1;
-        double max_regret = -1.0;
-
-        struct InsertionInfo
-        {
-            int veh_id;
-            int p_pos;
-            int d_pos;
-            double cost;
-        };
-
-        InsertionInfo global_best_move = {-1, -1, -1, 1e9};
-
-        // Evaluate every pending request
-        for (int req_idx : pending_reqs)
-        {
-
-            // Find Best and Second Best insertion costs for this specific request
-            double best_cost = 1e9;
-            double second_best_cost = 1e9;
-            InsertionInfo current_req_best_move = {-1, -1, -1, 1e9};
-
-            int p_node = graph.getPickupNodeId(req_idx);
-            int d_node = graph.getDeliveryNodeId(req_idx);
-
-            // Check all vehicles
-            for (auto &[veh_id, route] : sol.routes)
-            {
-                int v_idx = veh_id - 1;
-                // if (!requests[req_idx].isVehicleCompatible(vehicles[v_idx].category))
-                //     continue;
-
-                double current_route_cost = calculateRouteCost(route, vehicles[v_idx]);
-
-                // Check all positions
-                for (int i = 1; i < (int)route.size(); ++i)
-                {
-                    for (int j = i; j < (int)route.size(); ++j)
-                    {
-                        if (checker.checkInsert(route, v_idx, p_node, d_node, i, j))
-                        {
-                            // Calculate Cost
-                            std::vector<int> temp_route = route;
-                            temp_route.insert(temp_route.begin() + j, d_node);
-                            temp_route.insert(temp_route.begin() + i, p_node);
-
-                            double new_cost = calculateRouteCost(temp_route, vehicles[v_idx]);
-                            double added_cost = new_cost - current_route_cost;
-
-                            if (added_cost < best_cost)
-                            {
-                                second_best_cost = best_cost;
-                                best_cost = added_cost;
-                                current_req_best_move = {veh_id, i, j, added_cost};
-                            }
-                            else if (added_cost < second_best_cost)
-                            {
-                                second_best_cost = added_cost;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Calculate Regret (Difference between 2nd best and best)
-            // If only one option exists, regret is infinite (must pick this one)
-            double regret = second_best_cost - best_cost;
-            if (second_best_cost >= 1e8 && best_cost < 1e8)
-                regret = 1e9;
-
-            if (best_cost >= 1e8)
-            {
-                // Cannot be inserted anywhere currently
-                continue;
-            }
-
-            // Maximize Regret
-            if (regret > max_regret)
-            {
-                max_regret = regret;
-                best_req_to_insert = req_idx;
-                global_best_move = current_req_best_move;
-            }
-        }
-
-        if (best_req_to_insert != -1)
-        {
-            // Perform the best move for the high-regret request
-            auto &route = sol.routes[global_best_move.veh_id];
-            int p_node = graph.getPickupNodeId(best_req_to_insert);
-            int d_node = graph.getDeliveryNodeId(best_req_to_insert);
-
-            route.insert(route.begin() + global_best_move.d_pos, d_node);
-            route.insert(route.begin() + global_best_move.p_pos, p_node);
-
-            // Remove from pending
-            pending_reqs.erase(std::remove(pending_reqs.begin(), pending_reqs.end(), best_req_to_insert), pending_reqs.end());
-        }
-        else
-        {
-            // No valid moves for remaining requests
-            for (int r : pending_reqs)
-                sol.unserved_requests.push_back(r);
-            break;
-        }
-    }
-
     sol.total_cost = calculateTotalCost(sol);
 }
 

@@ -3,11 +3,7 @@
 #include "Vehicle.h"
 #include "Route.h"
 #include <vector>
-<<<<<<< HEAD
-#include "CSVReader.h" 
-=======
 #include "CSVReader.h"
->>>>>>> 361227c (final hosted)
 #include "globals.h"
 
 std::vector<Route> solveALNS(
