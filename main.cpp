@@ -467,16 +467,16 @@ int main()
 
         std::thread t1([&](){ alns_res = run_solver("ALNS", "main_ALNS", reqDir); });
         std::thread t2([&](){ bac_res = run_solver("Branch-And-Cut", "main_BAC", reqDir); });
-        std::thread t3([&](){ crds_res = run_solver("Clustering-Routing-DP-Solver", "main_crds", reqDir); });
+        //std::thread t3([&](){ crds_res = run_solver("Clustering-Routing-DP-Solver", "main_crds", reqDir); });
         std::thread t4([&](){ hd_res = run_solver("Heterogeneous_DARP", "hetero", reqDir); });
-        std::thread t5([&](){ vns_res = run_solver("Variable_Neighbourhood_Search", "main_vns", reqDir); });
+        //std::thread t5([&](){ vns_res = run_solver("Variable_Neighbourhood_Search", "main_vns", reqDir); });
         std::thread t6([&](){ god = run_solver("god", "god", reqDir); });
 
         t1.join();
         t2.join();
-        t3.join();
+        //t3.join();
         t4.join();
-        t5.join();
+        //t5.join();
         t6.join();
         
         // 6. Build Response
@@ -498,12 +498,12 @@ int main()
             {"csv_employee", bac_res.output_employee}
         };
 
-        response["results"]["CRDS"] = {
-            {"status", crds_res.status},
-            {"logs", crds_res.logs},
-            {"csv_vehicle", crds_res.output_vehicle},
-            {"csv_employee", crds_res.output_employee}
-        };
+        // response["results"]["CRDS"] = {
+        //     {"status", crds_res.status},
+        //     {"logs", crds_res.logs},
+        //     {"csv_vehicle", crds_res.output_vehicle},
+        //     {"csv_employee", crds_res.output_employee}
+        // };
 
         response["results"]["HD"] = {
             {"status", hd_res.status},
@@ -512,12 +512,12 @@ int main()
             {"csv_employee", hd_res.output_employee}
         };
 
-        response["results"]["VNS"] = {
-            {"status", vns_res.status},
-            {"logs", vns_res.logs},
-            {"csv_vehicle", vns_res.output_vehicle},
-            {"csv_employee", vns_res.output_employee}
-        };
+        // response["results"]["VNS"] = {
+        //     {"status", vns_res.status},
+        //     {"logs", vns_res.logs},
+        //     {"csv_vehicle", vns_res.output_vehicle},
+        //     {"csv_employee", vns_res.output_employee}
+        // };
 
         response["results"]["GOD"] = {
             {"status", god.status},

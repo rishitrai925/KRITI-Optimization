@@ -1004,7 +1004,9 @@ SolutionMetrics calculateDetailedMetrics(const Chromosome &best,
 void writeCSVOutput(const string &filename,
                     const Chromosome &solution,
                     const vector<Person> &persons,
-                    const vector<Driver> &drivers)
+                    const vector<Driver> &drivers,
+                    double cost_no_penalty,
+                    double penalty)
 {
     ofstream file(filename);
     if (!file.is_open())
@@ -1012,7 +1014,7 @@ void writeCSVOutput(const string &filename,
         cerr << "Error: Cannot create " << filename << "\n";
         return;
     }
-
+    file << cost_no_penalty << "," << penalty << "\n";
     file << "vehicle_id,category,employee_id,pickup_time,drop_time\n";
 
     int N = persons.size();
@@ -1116,10 +1118,11 @@ int main(int argc, char *argv[])
     vector<string> subfolders = {
         "ALNS",
         "Branch-And-Cut",
-        // "god",
-        "Heterogeneous_DARP",
-        "Variable_Neighbourhood_Search",
-        "Clustering-Routing-DP-Solver"};
+        "god",
+        "Heterogeneous_DARP"
+        //"Variable_Neighbourhood_Search",
+        // "Clustering-Routing-DP-Solver"
+    };
 
     cout << "\n[INFO] Loading initial population (exact vehicle assignments preserved)...\n";
     vector<Chromosome> population;
@@ -1175,18 +1178,25 @@ int main(int argc, char *argv[])
 
     // Write best imported solution to CSV for verification
     cout << "[INFO] Writing best initial solution to CSV for verification...\n";
+    SolutionMetrics init_metrics = calculateDetailedMetrics(bestEver, persons, drivers);
+    double init_penalty = bestEver.fitness - init_metrics.weightedObjective;
     writeCSVOutput(basePath + "memetic_algorithm/initial_best_output_vehicle.csv",
-                   bestEver, persons, drivers);
+                   bestEver, persons, drivers, init_metrics.weightedObjective, init_penalty);
     cout << "[INFO] Initial best written to: memetic_algorithm/initial_best_output_vehicle.csv\n\n";
 
     int POP_SIZE = population.size();
-    int GENERATIONS = 2000;
+    int GENERATIONS = 20000;
     mt19937 rng(chrono::steady_clock::now().time_since_epoch().count());
 
     auto start_time = chrono::high_resolution_clock::now();
 
     for (int gen = 0; gen < GENERATIONS; gen++)
     {
+        auto current_time = chrono::high_resolution_clock::now();
+        if (chrono::duration_cast<chrono::seconds>(current_time - start_time).count() >= 2)
+        {
+            break;
+        }
         sort(population.begin(), population.end(),
              [](const Chromosome &a, const Chromosome &b)
              { return a.fitness < b.fitness; });
@@ -1239,16 +1249,17 @@ int main(int argc, char *argv[])
 
     // =================== OUTPUT ===================
 
+    SolutionMetrics metrics = calculateDetailedMetrics(bestEver, persons, drivers);
+    double penaltyComponent = bestEver.fitness - metrics.weightedObjective;
+
     cout << "\n[INFO] Writing final solution...\n";
-    writeCSVOutput(basePath + "memetic_algorithm/final_output_vehicle.csv",
-                   bestEver, persons, drivers);
+    writeCSVOutput(basePath + "memetic_algorithm/output_vehicle.csv",
+                   bestEver, persons, drivers, metrics.weightedObjective, penaltyComponent);
 
     cout << "\n"
          << string(80, '=') << "\n";
     cout << "                    FINAL METRICS BREAKDOWN\n";
     cout << string(80, '=') << "\n\n";
-
-    SolutionMetrics metrics = calculateDetailedMetrics(bestEver, persons, drivers);
 
     cout << left << setw(35) << "Total Distance:"
          << fixed << setprecision(4) << metrics.totalDistance << " km\n";
