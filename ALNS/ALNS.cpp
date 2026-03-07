@@ -54,9 +54,9 @@ std::vector<Route> solveALNS(
     enum DestroyOp
     {
         RAND_D,
-        WORST_D,
+        LONGEST_D,
         VEHICLE_D,
-        TIMEWIN_D
+        WORST_D
     };
     enum RepairOp
     {
@@ -123,12 +123,12 @@ std::vector<Route> solveALNS(
         int q = std::max(k2, static_cast<int>(k1 * emp.size()));
         if (d == RAND_D)
             randomDestroy(next, q);
-        else if (d == WORST_D)
-            worstCostDestroy(next, q);
+        else if (d == LONGEST_D)
+            LongestRouteTailRemoval(next, q);
         else if (d == VEHICLE_D)
             vehicleDestroy(next);
         else
-            timeWindowDestroy(next, emp, veh, meta);
+            WorstRouteTailRemoval(next, emp, veh, meta);
 
         if (r == GREEDY_R)
             greedyRepair(next, emp, veh, meta);
