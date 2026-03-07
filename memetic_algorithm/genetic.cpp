@@ -1277,7 +1277,7 @@ int main(int argc, char *argv[])
          << metrics.totalPassengerRideTime << " * " << OBJ_TIME_WEIGHT
          << ") = " << metrics.weightedObjective << "\n";
 
-    double penaltyComponent = bestEver.fitness - metrics.weightedObjective;
+    penaltyComponent = bestEver.fitness - metrics.weightedObjective;
     if (penaltyComponent > 1.0)
         cout << "[WARN] Penalty present: " << penaltyComponent << "\n";
     else
