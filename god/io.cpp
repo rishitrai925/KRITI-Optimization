@@ -29,10 +29,8 @@ int read_vehicle_data(std::string file_name, DARPInstance &instance)
         return 0;
     }
 
-    // Read header line
     std::getline(file, line);
 
-    // Read data lines
     while (std::getline(file, line))
     {
         if (!line.empty() && line.back() == '\r')
@@ -55,9 +53,8 @@ int read_vehicle_data(std::string file_name, DARPInstance &instance)
         std::getline(ss, available_from_time_str, ',');
         std::getline(ss, category_str, ',');
 
-        int internal_vehicle_id = number_of_vehicles + 1; // Sequential ID: 1, 2, 3...
-        
-        // Store original ID for output mapping
+        int internal_vehicle_id = number_of_vehicles + 1;
+
         if (instance.vehicle_id_to_original.size() <= (size_t)internal_vehicle_id)
             instance.vehicle_id_to_original.resize(internal_vehicle_id + 1);
         instance.vehicle_id_to_original[internal_vehicle_id] = vehicle_id_str;
@@ -83,11 +80,10 @@ int read_vehicle_data(std::string file_name, DARPInstance &instance)
 
         int category;
         if (category_str == "premium")
-            category = 0; // 0 : premium
+            category = 0;
         else
-            category = 1; // 1 : normal
+            category = 1;
 
-        // Parse time
         double available_from_time;
         std::stringstream time_ss(available_from_time_str);
         std::string hrs_str, mins_str;
@@ -95,13 +91,12 @@ int read_vehicle_data(std::string file_name, DARPInstance &instance)
         std::getline(time_ss, mins_str, ':');
         int hrs = std::stoi(hrs_str);
         int mins = std::stoi(mins_str);
-        available_from_time = hrs * 60 + mins; // Convert to minutes
+        available_from_time = hrs * 60 + mins;
 
-        // Process the vehicle data
         Node depot_node(
             internal_vehicle_id, NodeType::DEPOT,
             curr_lat, curr_lon,
-            available_from_time, 24 * 60, // Convert 24 hours to minutes
+            available_from_time, 24 * 60,
             0,
             0,
             0);
@@ -137,7 +132,7 @@ int count_csv_data_rows(const std::string &file_name)
     if (!file.is_open())
         return 0;
     std::string line;
-    std::getline(file, line); // skip header
+    std::getline(file, line);
     int count = 0;
     while (std::getline(file, line))
         if (!line.empty())
@@ -158,10 +153,8 @@ int read_employee_data(std::string file_name, DARPInstance &instance,
         return 0;
     }
 
-    // Read header line
     std::getline(file, line);
 
-    // Read data lines
     while (std::getline(file, line))
     {
         if (!line.empty() && line.back() == '\r')
@@ -184,9 +177,8 @@ int read_employee_data(std::string file_name, DARPInstance &instance,
         std::getline(ss, vehicle_preference_str, ',');
         std::getline(ss, sharing_preference_str, ',');
 
-        int internal_employee_id = number_of_employees + 1; // Sequential ID: 1, 2, 3...
+        int internal_employee_id = number_of_employees + 1;
 
-        // Store original ID for output mapping
         if (instance.employee_id_to_original.size() <= (size_t)internal_employee_id)
             instance.employee_id_to_original.resize(internal_employee_id + 1);
         instance.employee_id_to_original[internal_employee_id] = employee_id_str;
@@ -199,9 +191,9 @@ int read_employee_data(std::string file_name, DARPInstance &instance,
 
         int vehicle_preference;
         if (vehicle_preference_str == "premium")
-            vehicle_preference = 0; // 0 : premium
+            vehicle_preference = 0;
         else
-            vehicle_preference = 1; // 1 : normal, any
+            vehicle_preference = 1;
 
         int sharing_preference;
         if (sharing_preference_str == "single")
@@ -211,9 +203,8 @@ int read_employee_data(std::string file_name, DARPInstance &instance,
         else if (sharing_preference_str == "triple")
             sharing_preference = 3;
         else
-            sharing_preference = 3; // Default to triple
+            sharing_preference = 3;
 
-        // Parse earliest pickup time
         double earliest_pickup;
         std::stringstream time_ss1(earliest_pickup_str);
         std::string hrs_str1, mins_str1;
@@ -221,9 +212,8 @@ int read_employee_data(std::string file_name, DARPInstance &instance,
         std::getline(time_ss1, mins_str1, ':');
         int hrs1 = std::stoi(hrs_str1);
         int mins1 = std::stoi(mins_str1);
-        earliest_pickup = hrs1 * 60 + mins1; // Convert to minutes
+        earliest_pickup = hrs1 * 60 + mins1;
 
-        // Parse latest drop time
         double latest_drop;
         std::stringstream time_ss2(latest_drop_str);
         std::string hrs_str2, mins_str2;
@@ -231,7 +221,7 @@ int read_employee_data(std::string file_name, DARPInstance &instance,
         std::getline(time_ss2, mins_str2, ':');
         int hrs2 = std::stoi(hrs_str2);
         int mins2 = std::stoi(mins_str2);
-        latest_drop = hrs2 * 60 + mins2; // Convert to minutes
+        latest_drop = hrs2 * 60 + mins2;
 
         int pid = pickup_offset + internal_employee_id;
         int did = delivery_offset + internal_employee_id;
@@ -239,7 +229,7 @@ int read_employee_data(std::string file_name, DARPInstance &instance,
         Node pickup_node(
             pid, NodeType::PICKUP,
             pickup_lat, pickup_lon,
-            earliest_pickup, 24 * 60, // Convert to minutes
+            earliest_pickup, 24 * 60,
             0,
             1,
             sharing_preference, '\0', priority);
@@ -251,7 +241,7 @@ int read_employee_data(std::string file_name, DARPInstance &instance,
         Node drop_node(
             did, NodeType::DELIVERY,
             drop_lat, drop_lon,
-            0, latest_drop + allowed_delay, // Allow delay based on priority
+            0, latest_drop + allowed_delay,
             0,
             -1,
             sharing_preference, '\0', priority);
@@ -261,9 +251,9 @@ int read_employee_data(std::string file_name, DARPInstance &instance,
 
         uint32_t compatible_vehicle_types = 0;
         if (vehicle_preference == 0)
-            compatible_vehicle_types = (1u << 0); // Only premium
+            compatible_vehicle_types = (1u << 0);
         else
-            compatible_vehicle_types = (1u << 0) | (1u << 1); // Both premium and normal
+            compatible_vehicle_types = (1u << 0) | (1u << 1);
 
         Request r(
             internal_employee_id,
@@ -277,7 +267,6 @@ int read_employee_data(std::string file_name, DARPInstance &instance,
         number_of_employees++;
     }
 
-    // Initialize tariffs (if not already set by metadata)
     if (instance.tariff_a.empty())
     {
         instance.tariff_a = {{60, 0.0}, {120, 0.0}, {180, 0.0}};
@@ -299,7 +288,7 @@ std::vector<std::string> split(const std::string &s, char delimiter)
     while (std::getline(tokenStream, token, delimiter))
     {
         if (!token.empty() && token.back() == '\r')
-            token.pop_back(); // Handle Windows line endings
+            token.pop_back();
         tokens.push_back(token);
     }
     return tokens;
@@ -315,10 +304,8 @@ void read_metadata(std::string file_name)
     }
 
     std::string line;
-    // Skip header
     std::getline(file, line);
 
-    // Read metadata key-value pairs
     while (std::getline(file, line))
     {
         std::vector<std::string> row = split(line, ',');
@@ -343,34 +330,28 @@ void read_metadata(std::string file_name)
 void loadMatrix(const std::string &filename, DARPInstance &instance, int num_employees, int num_vehicles,
                 int pickup_base, int delivery_base)
 {
-    const int MATRIX_SIZE = num_employees + num_vehicles + 1; // Actual matrix file size
+    const int MATRIX_SIZE = num_employees + num_vehicles + 1;
     const int NUM_EMPLOYEES = num_employees;
     const int NUM_VEHICLES = num_vehicles;
-    const int OFFICE_IDX = NUM_EMPLOYEES + NUM_VEHICLES; // Last matrix index is office
+    const int OFFICE_IDX = NUM_EMPLOYEES + NUM_VEHICLES;
 
-    // Create mapping from matrix index to VNS node ID
     std::vector<int> matrix_to_node_id(MATRIX_SIZE);
 
-    // Matrix indices 0..(NUM_EMPLOYEES-1) (employee pickups) → Node IDs [pickup_base+1..pickup_base+N]
     for (int i = 0; i < NUM_EMPLOYEES; i++)
     {
         matrix_to_node_id[i] = pickup_base + 1 + i;
     }
 
-    // Matrix indices NUM_EMPLOYEES..(NUM_EMPLOYEES+NUM_VEHICLES-1) (vehicle depots) → Node IDs 1..NUM_VEHICLES
     for (int i = 0; i < NUM_VEHICLES; i++)
     {
         matrix_to_node_id[NUM_EMPLOYEES + i] = 1 + i;
     }
 
-    // Office index - we'll handle this separately for deliveries
-    matrix_to_node_id[OFFICE_IDX] = delivery_base + 1; // Temporary mapping
+    matrix_to_node_id[OFFICE_IDX] = delivery_base + 1;
 
-    // Find maximum node ID needed
-    int max_node_id = delivery_base + NUM_EMPLOYEES; // Highest delivery node
+    int max_node_id = delivery_base + NUM_EMPLOYEES;
     instance.fit_structures(max_node_id);
 
-    // Initialize all distances to infinity
     for (int i = 0; i <= max_node_id; i++)
     {
         for (int j = 0; j <= max_node_id; j++)
@@ -380,7 +361,6 @@ void loadMatrix(const std::string &filename, DARPInstance &instance, int num_emp
         }
     }
 
-    // Read the 12x12 matrix from file
     std::ifstream fin(filename);
     if (!fin)
     {
@@ -398,7 +378,6 @@ void loadMatrix(const std::string &filename, DARPInstance &instance, int num_emp
     }
     fin.close();
 
-    // Map the 12x12 matrix to VNS node ID space
     for (int i = 0; i < MATRIX_SIZE; i++)
     {
         for (int j = 0; j < MATRIX_SIZE; j++)
@@ -408,10 +387,8 @@ void loadMatrix(const std::string &filename, DARPInstance &instance, int num_emp
 
             double dist = temp_matrix[i][j];
 
-            // Handle office index specially
             if (i == OFFICE_IDX)
             {
-                // From office to other nodes - map to all delivery nodes
                 for (int d = delivery_base + 1; d <= delivery_base + NUM_EMPLOYEES; d++)
                 {
                     instance.distance_matrix[d][node_j] = dist;
@@ -420,7 +397,6 @@ void loadMatrix(const std::string &filename, DARPInstance &instance, int num_emp
             }
             if (j == OFFICE_IDX)
             {
-                // From other nodes to office - map to all delivery nodes
                 for (int d = delivery_base + 1; d <= delivery_base + NUM_EMPLOYEES; d++)
                 {
                     instance.distance_matrix[node_i][d] = dist;
@@ -429,14 +405,12 @@ void loadMatrix(const std::string &filename, DARPInstance &instance, int num_emp
             }
             if (i != OFFICE_IDX && j != OFFICE_IDX)
             {
-                // Regular mapping
                 instance.distance_matrix[node_i][node_j] = dist;
                 instance.time_matrix[node_i][node_j] = dist;
             }
         }
     }
 
-    // Special case: office to office (all delivery nodes to each other)
     double office_to_office = temp_matrix[OFFICE_IDX][OFFICE_IDX];
     for (int d1 = delivery_base + 1; d1 <= delivery_base + NUM_EMPLOYEES; d1++)
     {
@@ -455,11 +429,10 @@ void loadMatrix(const std::string &filename, DARPInstance &instance, int num_emp
     std::cout << "  Matrix [" << OFFICE_IDX << "]   (Office)           → Nodes [" << (delivery_base + 1) << "-" << (delivery_base + NUM_EMPLOYEES) << "]\n";
 }
 
-// Helper: convert minutes since midnight to "HH:MM" string
 static std::string min_to_time_str(int minutes)
 {
-    minutes = std::max(0, minutes); // Ensure non-negative
-    minutes = minutes % (24 * 60);  // Wrap around after 24 hours
+    minutes = std::max(0, minutes);
+    minutes = minutes % (24 * 60);
     int hrs = minutes / 60;
     int mins = minutes % 60;
     char buf[6];
@@ -467,7 +440,6 @@ static std::string min_to_time_str(int minutes)
     return std::string(buf);
 }
 
-// Helper: format an integer ID with a prefix and zero-padding (e.g., 'V', 1 → "V01")
 static std::string format_id(char prefix, int id)
 {
     char buf[8];
@@ -475,15 +447,6 @@ static std::string format_id(char prefix, int id)
     return std::string(buf);
 }
 
-// Writes output_vehicles.csv and output_employees.csv in the current directory.
-// Simulates route timing (matching evaluate.cpp logic) to extract pickup/drop times.
-//
-// output_vehicles.csv format:
-//   vehicle_id,category,employee_id,pickup_time,drop_time
-//
-// output_employees.csv format:
-//   employee_id,pickup_time,drop_time
-//
 void write_output_csvs(const Solution &solution, DARPInstance &instance, std::string base, double objective_cost)
 {
     struct CSVRow
@@ -496,7 +459,7 @@ void write_output_csvs(const Solution &solution, DARPInstance &instance, std::st
     };
 
     std::vector<CSVRow> rows;
-    double total_delay = 0.0; // accumulate delay minutes
+    double total_delay = 0.0;
 
     for (const Route &route : solution.routes)
     {
@@ -508,7 +471,6 @@ void write_output_csvs(const Solution &solution, DARPInstance &instance, std::st
         std::string category = (vehicle.type_id == 0) ? "Premium" : "Normal";
         std::string vehicle_id_str = instance.vehicle_id_to_original[vehicle.id];
 
-        // Timing simulation (mirrors calculate_route_stats in evaluate.cpp)
         int prev_node_id = vehicle.depot_id;
         const Node *prev_node = &instance.nodes[prev_node_id];
 
@@ -518,7 +480,6 @@ void write_output_csvs(const Solution &solution, DARPInstance &instance, std::st
         double start_time = std::max(depot_node.e, first_node.e - (dist_to_first / speed) * 60.0);
         double current_time = start_time;
 
-        // Map request_id -> pickup time string
         std::unordered_map<int, std::string> pickup_time_of_request;
 
         for (int node_id : route.sequence)
@@ -549,8 +510,6 @@ void write_output_csvs(const Solution &solution, DARPInstance &instance, std::st
                     row.drop_time = min_to_time_str(static_cast<int>(start_service));
                     rows.push_back(row);
 
-                    // ---- Compute delay for this employee ----
-                    // Original deadline (without priority extension) = node.l - allowed_delay
                     int allowed_delay = 0;
                     auto delay_it = PRIORITY_DELAYS.find(node.priority);
                     if (delay_it != PRIORITY_DELAYS.end())
@@ -558,7 +517,6 @@ void write_output_csvs(const Solution &solution, DARPInstance &instance, std::st
                     double original_deadline = node.l - allowed_delay;
                     double delay = std::max(0.0, start_service - original_deadline);
                     total_delay += delay;
-                    // -----------------------------------------
 
                     pickup_time_of_request.erase(it);
                 }
@@ -570,11 +528,8 @@ void write_output_csvs(const Solution &solution, DARPInstance &instance, std::st
         }
     }
 
-    // Write output_vehicles.csv
-    // Format: vehicle_id,category,employee_id,pickup_time,drop_time
     {
         std::ofstream fout(base + "/god/output_vehicle.csv", std::ios::trunc);
-        // Summary line: objective_cost, weighted_total_delay, unassigned count
         fout << objective_cost << "," << total_delay * Params::BETA << "," << solution.unassigned_requests.size() << "\n";
 
         fout << "vehicle_id,category,employee_id,pickup_time,drop_time\n";
@@ -584,8 +539,6 @@ void write_output_csvs(const Solution &solution, DARPInstance &instance, std::st
         fout.close();
     }
 
-    // Write output_employees.csv
-    // Format: employee_id,pickup_time,drop_time
     {
         std::ofstream fout(base + "/god/output_employees.csv", std::ios::trunc);
         fout << "employee_id,pickup_time,drop_time\n";

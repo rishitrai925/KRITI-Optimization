@@ -2,7 +2,6 @@
 
 Solution initial_solution(DARPInstance &instance)
 {
-    // 1. Initialize empty routes (one per vehicle)
     std::vector<Route> routes;
     for (const auto &veh : instance.vehicles)
         routes.emplace_back(&veh);
@@ -10,7 +9,6 @@ Solution initial_solution(DARPInstance &instance)
     std::vector<int> unassigned;
     Solution solution(routes, unassigned);
 
-    // 2. Sort requests by delivery time window (l_i)
     std::vector<Request> sorted_requests(
         instance.requests.begin(), instance.requests.end());
 
@@ -20,7 +18,6 @@ Solution initial_solution(DARPInstance &instance)
                   return a.delivery_node.l < b.delivery_node.l;
               });
 
-    // 3. Process each request using Best Insertion
     for (const auto &req : sorted_requests)
     {
         double best_overall_cost = std::numeric_limits<double>::infinity();
@@ -29,14 +26,12 @@ Solution initial_solution(DARPInstance &instance)
 
         for (auto &route : solution.routes)
         {
-            // Skip incompatible vehicles
             if (!(req.compatible_vehicle_types & (1u << route.vehicle->type_id)))
                 continue;
 
             if (route.vehicle->average_speed <= 0.0)
                 continue;
 
-            // Find best insertion position in this route
             auto result = insert_request_best_position(
                 route, req, instance,
                 solution.alpha, solution.beta, solution.gamma);
@@ -60,7 +55,6 @@ Solution initial_solution(DARPInstance &instance)
         }
     }
 
-    // 4. Final evaluation
     evaluate_solution(solution, instance);
 
     return solution;
