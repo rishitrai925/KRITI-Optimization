@@ -35,8 +35,9 @@ Network I/O is the biggest bottleneck in generating large distance matrices. Ins
 * An `std::atomic<bool> osrm_failed` flag is monitored. If network errors occur, the threads are cleanly joined, and the system re-launches the thread pool entirely in Haversine mode.
 
 ### Parallel Solver Execution
-Route optimization algorithms are notoriously CPU-intensive. The backend executes multiple heuristic and exact solvers in parallel:
-* **Sandboxed Execution:** Each algorithm (e.g., `main_ALNS`, `main_BAC`) is executed in its own dedicated subdirectory within the request's temp folder.
+Route optimization algorithms are notoriously CPU-intensive. The backend executes multiple heuristic in parallel:
+* **Sandboxed Execution:** Each algorithm is executed in its own dedicated subdirectory within the request's temp folder.
 * **Thread Dispatch:** A thread pool is spun up for `ALNS`, `Branch-And-Cut`, `Heterogeneous_DARP`, and `god` solvers. 
 * **Thread Safety:** Standard output logging (`std::cout`) across the concurrent algorithm runners is protected by a global `std::mutex log_mutex` to prevent interleaved terminal output.
 * **Sequential Processing (Solution Seeding):** The `Memetic` algorithm is executed after the parallel block joins. Rather than running from scratch, it ingests the completed outputs from the preceding algorithms as its initial population, applying evolutionary techniques to further refine and optimize the final routes.
+
